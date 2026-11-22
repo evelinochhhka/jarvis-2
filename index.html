@@ -12,6 +12,12 @@
 
   <meta name="theme-color" content="#101316">
 
+  <link rel="manifest" href="./manifest.json">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <meta name="description" content="JARVIS 2 Personal Assistant">
 
   <title>JARVIS 2</title>
@@ -883,6 +889,24 @@
     updateClock();
 
     setInterval(updateClock, 1000);
+
+  </script>
+
+  <script>
+
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+
+      window.addEventListener("load", () => {
+
+        navigator.serviceWorker.register("./sw.js").catch(error => {
+
+          console.error("JARVIS service worker registration failed:", error);
+
+        });
+
+      });
+
+    }
 
   </script>
 
