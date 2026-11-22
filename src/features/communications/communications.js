@@ -1,3 +1,4 @@
+import { renderFocusShortcuts } from "../focus/focus-shortcuts.js";
 import {
   disablePushNotifications,
   enablePushNotifications,
@@ -93,5 +94,6 @@ export function renderCommunications() {
     "Подключения пока не активированы. Здесь не запрашиваются пароли от соцсетей; будущая авторизация должна проходить только через официальные механизмы."
   ));
   shell.append(integrations);
+  shell.append(renderFocusShortcuts());
   return shell;
 }
