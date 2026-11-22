@@ -44,11 +44,16 @@ public actor CommandQueueStore {
 
     private func loadIfNeeded() throws {
         guard !loaded else { return }
-        loaded = true
-        guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            loaded = true
+            return
+        }
         do {
             commands = try JSONDecoder.jarvis.decode([JarvisCommand].self, from: Data(contentsOf: fileURL))
-        } catch { throw QueueError.corruptStore }
+            loaded = true
+        } catch {
+            throw QueueError.corruptStore
+        }
     }
 
     private func persist() throws {
