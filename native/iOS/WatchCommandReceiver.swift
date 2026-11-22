@@ -2,8 +2,23 @@ import Foundation
 import WatchConnectivity
 import JarvisCore
 
+private actor WatchPayloadLedger {
+    private let key = "jarvis2.watch.processedPayloadIDs"
+
+    func contains(_ id: String) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(id)
+    }
+
+    func markProcessed(_ id: String) {
+        var ids = UserDefaults.standard.stringArray(forKey: key) ?? []
+        ids.append(id)
+        UserDefaults.standard.set(Array(ids.suffix(500)), forKey: key)
+    }
+}
+
 final class WatchCommandReceiver: NSObject, WCSessionDelegate {
     private let processor = JarvisCommandProcessor()
+    private let payloadLedger = WatchPayloadLedger()
 
     override init() {
         super.init()
@@ -30,7 +45,9 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
     }
 
     private func process(_ payload: [String: Any], replyHandler: (([String: Any]) -> Void)?) {
-        guard let rawKind = payload["kind"] as? String,
+        guard let payloadID = payload["id"] as? String,
+              UUID(uuidString: payloadID) != nil,
+              let rawKind = payload["kind"] as? String,
               let kind = JarvisCommandKind(rawValue: rawKind),
               let text = payload["text"] as? String,
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -39,8 +56,14 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
         }
 
         Task {
+            if await payloadLedger.contains(payloadID) {
+                replyHandler?(["accepted": true, "state": "duplicate"])
+                return
+            }
+
             do {
                 let result = try await processor.process(kind: kind, text: text)
+                await payloadLedger.markProcessed(payloadID)
                 switch result {
                 case let .saved(list, entryID):
                     replyHandler?(["accepted": true, "state": "saved",
