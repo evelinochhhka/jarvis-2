@@ -53,7 +53,7 @@ struct JarvisWorkspaceView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "tray").font(.largeTitle).foregroundStyle(.secondary)
                     Text("Пока пусто").font(.headline)
-                    Text("Добавьте первую запись в раздел «\\(selectedList.title)».")
+                    Text("Добавьте первую запись в раздел «\(selectedList.title)».")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -125,15 +125,16 @@ struct JarvisWorkspaceView: View {
                     : nil
                 let entry = try await store.add(to: selectedList, title: title, reminder: schedule)
                 draft = ""
+                var schedulingError: String?
                 if selectedList == .reminders {
                     do {
                         try await reminderScheduler.schedule(entry)
-                        errorMessage = nil
                     } catch {
-                        errorMessage = "Напоминание сохранено, но системное уведомление не включено. Проверьте разрешения и дату."
+                        schedulingError = "Напоминание сохранено, но системное уведомление не включено. Проверьте разрешения и дату."
                     }
                 }
                 await reload()
+                if let schedulingError { errorMessage = schedulingError }
             } catch {
                 errorMessage = "Не удалось сохранить запись."
             }
