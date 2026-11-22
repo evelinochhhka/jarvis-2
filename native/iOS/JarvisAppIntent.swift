@@ -15,8 +15,8 @@ struct JarvisAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: OpenJarvisIntent(),
             phrases: [
-                "Позови JARVIS",
-                "Открой JARVIS"
+                "Позови \(.applicationName)",
+                "Открой \(.applicationName)"
             ],
             shortTitle: "Позвать JARVIS",
             systemImageName: "waveform"
