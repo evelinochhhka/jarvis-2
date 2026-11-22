@@ -1,4 +1,4 @@
-const CACHE_NAME = "jarvis-2-v3";
+const CACHE_NAME = "jarvis-2-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -71,4 +71,39 @@ self.addEventListener("fetch", event => {
       return response;
     })
   );
+});
+
+
+self.addEventListener("push", event => {
+  event.waitUntil((async () => {
+    let payload = {};
+    try {
+      payload = event.data ? event.data.json() : {};
+    } catch {
+      payload = { body: event.data?.text() || "Новое уведомление JARVIS." };
+    }
+    const title = typeof payload.title === "string" ? payload.title : "JARVIS";
+    const options = {
+      body: typeof payload.body === "string" ? payload.body : "У вас новое уведомление.",
+      tag: typeof payload.tag === "string" ? payload.tag : "jarvis-notification",
+      data: { url: typeof payload.url === "string" ? payload.url : "./" }
+    };
+    await self.registration.showNotification(title, options);
+  })());
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "./", self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("focus" in client) {
+        await client.focus();
+        if ("navigate" in client) await client.navigate(target);
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
 });
