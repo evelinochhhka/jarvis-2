@@ -109,7 +109,7 @@ test("OpenAI-compatible adapter sends the bilingual system prompt and parses con
   assert.match(captured.body.messages[0].content, /русский и украинский/);
   assert.deepEqual(captured.body.messages[1], {
     role: "user",
-    content: "Попередний контекст"
+    content: "Попередній контекст"
   });
   assert.deepEqual(captured.body.messages[2], {
     role: "user",
