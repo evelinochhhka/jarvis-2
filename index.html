@@ -640,37 +640,37 @@
 
       <div class="nav-label">WORKSPACE</div>
 
-      <button class="nav-item active">
+      <button class="nav-item active" data-view="home">
 
         <span class="nav-icon">⌂</span> Главная
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="chat">
 
         <span class="nav-icon">◈</span> Диалог
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="tasks">
 
         <span class="nav-icon">▤</span> Хочу сделать
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="watchlist">
 
         <span class="nav-icon">◇</span> Хочу посмотреть
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="wishlist">
 
         <span class="nav-icon">✧</span> Мои хотелки
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="reminders">
 
         <span class="nav-icon">◷</span> Напоминания
 
@@ -678,13 +678,13 @@
 
       <div class="nav-label">SYSTEM</div>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="files">
 
         <span class="nav-icon">▧</span> Файлы
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="settings">
 
         <span class="nav-icon">⚙</span> Настройки
 
@@ -891,6 +891,8 @@
     setInterval(updateClock, 1000);
 
   </script>
+
+  <script type="module" src="./src/app/main.js"></script>
 
   <script>
 
