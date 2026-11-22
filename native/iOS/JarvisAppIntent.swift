@@ -1,4 +1,5 @@
 import AppIntents
+import Foundation
 
 struct OpenJarvisIntent: AppIntent {
     static var title: LocalizedStringResource = "Открыть JARVIS"
