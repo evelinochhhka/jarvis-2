@@ -56,4 +56,33 @@ final class JarvisCommandProcessorTests: XCTestCase {
         let restored = try await second.all(in: .wishlist)
         XCTAssertEqual(restored, [entry])
     }
+    func testReminderIsNotReportedAsScheduledWithoutDateAndTime() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let processor = JarvisCommandProcessor(
+            queue: CommandQueueStore(fileURL: directory.appendingPathComponent("queue.json")),
+            workspace: JarvisWorkspaceStore(fileURL: directory.appendingPathComponent("workspace.json"))
+        )
+
+        let result = try await processor.process("Напомни мне купить тетради")
+        guard case let .savedReminderNeedsSchedule(entryID) = result else {
+            return XCTFail("Reminder without a date must require scheduling")
+        }
+        let entries = try await processor.entries(in: .reminders)
+        XCTAssertEqual(entries.first?.id, entryID)
+        XCTAssertNil(entries.first?.reminder)
+    }
+
+    func testExplicitReminderSchedulePersists() async throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString).appendingPathComponent("workspace.json")
+        let store = JarvisWorkspaceStore(fileURL: url)
+        let date = Date(timeIntervalSince1970: 1_900_000_000)
+        let schedule = JarvisReminderSchedule(date: date, repeatFrequency: .weekly)
+        let created = try await store.add(to: .reminders, title: "Тренировка", reminder: schedule)
+        let reloaded = JarvisWorkspaceStore(fileURL: url)
+        let entries = try await reloaded.all(in: .reminders)
+        XCTAssertEqual(entries.first?.reminder, schedule)
+        XCTAssertEqual(entries.first?.id, created.id)
+    }
+
 }
