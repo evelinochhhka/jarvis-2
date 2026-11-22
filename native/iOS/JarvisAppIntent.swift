@@ -6,7 +6,8 @@ struct OpenJarvisIntent: AppIntent {
     static var openAppWhenRun = true
 
     func perform() async throws -> some IntentResult {
-        .result()
+        UserDefaults.standard.set(true, forKey: "jarvis2.openVoiceCapture")
+        return .result()
     }
 }
 
