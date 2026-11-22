@@ -8,6 +8,12 @@ struct JarvisIOSApp: App {
     var body: some Scene {
         WindowGroup { JarvisHomeView() }
     }
+
+    private func consumeVoiceRequest() {
+        guard openVoiceCapture else { return }
+        openVoiceCapture = false
+        showingVoiceCapture = true
+    }
 }
 
 final class JarvisAppDelegate: NSObject, UIApplicationDelegate {
@@ -22,6 +28,7 @@ final class JarvisAppDelegate: NSObject, UIApplicationDelegate {
 
 struct JarvisHomeView: View {
     @State private var showingVoiceCapture = false
+    @AppStorage("jarvis2.openVoiceCapture") private var openVoiceCapture = false
 
     var body: some View {
         NavigationStack {
@@ -71,6 +78,10 @@ struct JarvisHomeView: View {
             }
             .padding().navigationTitle("JARVIS 2")
             .sheet(isPresented: $showingVoiceCapture) { VoiceCaptureView() }
+            .onAppear { consumeVoiceRequest() }
+            .onChange(of: openVoiceCapture) { requested in
+                if requested { consumeVoiceRequest() }
+            }
         }
     }
 }
