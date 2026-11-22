@@ -72,7 +72,7 @@ struct VoiceCaptureView: View {
                 let result = try await processor.process(recognizer.transcript)
                 switch result {
                 case let .saved(list, _):
-                    queueMessage = "Сохранено в раздел «\\(list.title)»."
+                    queueMessage = "Сохранено в раздел «\(list.title)»."
                 case .requiresAI:
                     queueMessage = "Запрос сохранён. Для ответа требуется подключить ИИ-модель."
                 }
