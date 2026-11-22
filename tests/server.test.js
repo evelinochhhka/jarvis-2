@@ -49,13 +49,18 @@ test("chat returns a real provider response and conversation envelope", async ()
   const provider = { async generateReply(input) {
     assert.equal(input.message, "Привет");
     assert.equal(input.preferredLanguage, "uk");
+    assert.deepEqual(input.history, [{ role: "user", content: "Попередній контекст" }]);
     return "Вітаю.";
   } };
   await withServer({ config, provider }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/api/v1/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: " Привет ", preferredLanguage: "uk" })
+      body: JSON.stringify({
+        message: " Привет ",
+        preferredLanguage: "uk",
+        history: [{ role: "user", content: "Попередній контекст" }]
+      })
     });
     const payload = await response.json();
     assert.equal(response.status, 200);
@@ -102,6 +107,14 @@ test("OpenAI-compatible adapter sends the bilingual system prompt and parses con
   assert.equal(captured.url, "https://provider.invalid/v1/chat/completions");
   assert.equal(captured.body.model, "test-model");
   assert.match(captured.body.messages[0].content, /русский и украинский/);
+  assert.deepEqual(captured.body.messages[1], {
+    role: "user",
+    content: "Попередний контекст"
+  });
+  assert.deepEqual(captured.body.messages[2], {
+    role: "user",
+    content: "Привет"
+  });
   assert.equal(captured.options.headers.Authorization, "Bearer test-key");
 });
 
