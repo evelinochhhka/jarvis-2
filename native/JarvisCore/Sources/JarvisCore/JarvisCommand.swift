@@ -11,7 +11,7 @@ public struct JarvisCommand: Codable, Identifiable, Sendable, Equatable {
     public let createdAt: Date
     public var status: Status
 
-    public enum Status: String, Codable, Sendable { case queued, delivered, completed, failed }
+    public enum Status: String, Codable, Sendable, Equatable { case queued, delivered, completed, failed }
 
     public init(id: UUID = UUID(), kind: JarvisCommandKind, text: String,
                 createdAt: Date = .now, status: Status = .queued) {
