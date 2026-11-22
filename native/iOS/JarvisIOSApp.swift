@@ -58,6 +58,14 @@ struct JarvisHomeView: View {
                         .frame(maxWidth: .infinity).padding()
                 }
                 .buttonStyle(.bordered)
+
+                NavigationLink {
+                    JarvisFocusShortcutsView()
+                } label: {
+                    Label("Фокусирование", systemImage: "moon.zzz")
+                        .frame(maxWidth: .infinity).padding()
+                }
+                .buttonStyle(.bordered)
                 Text("Локальная очередь команд сохраняется на устройстве. Офлайн-ИИ и фоновое wake-word пока не подключены.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
