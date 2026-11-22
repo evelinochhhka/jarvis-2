@@ -8,12 +8,6 @@ struct JarvisIOSApp: App {
     var body: some Scene {
         WindowGroup { JarvisHomeView() }
     }
-
-    private func consumeVoiceRequest() {
-        guard openVoiceCapture else { return }
-        openVoiceCapture = false
-        showingVoiceCapture = true
-    }
 }
 
 final class JarvisAppDelegate: NSObject, UIApplicationDelegate {
@@ -35,8 +29,9 @@ struct JarvisHomeView: View {
             VStack(spacing: 22) {
                 Image(systemName: "waveform").font(.system(size: 54, weight: .light))
                 Text("JARVIS").font(.largeTitle.weight(.semibold))
-                Text("Голосовой запуск доступен по явному действию. Для запуска без открытия интерфейса используйте Siri Shortcut или App Intent.")
+                Text("Голосовой запуск доступен через Siri Shortcut или явное действие. iOS не разрешает стороннему приложению постоянно слушать кодовую фразу после закрытия.")
                     .multilineTextAlignment(.center).foregroundStyle(.secondary)
+
                 NavigationLink {
                     JarvisConversationView()
                 } label: {
@@ -48,7 +43,8 @@ struct JarvisHomeView: View {
                 Button { showingVoiceCapture = true } label: {
                     Label("Позвать JARVIS", systemImage: "mic.fill")
                         .font(.headline).frame(maxWidth: .infinity).padding()
-                }.buttonStyle(.borderedProminent)
+                }
+                .buttonStyle(.borderedProminent)
 
                 NavigationLink {
                     JarvisWorkspaceView()
@@ -73,15 +69,23 @@ struct JarvisHomeView: View {
                         .frame(maxWidth: .infinity).padding()
                 }
                 .buttonStyle(.bordered)
-                Text("Локальная очередь команд сохраняется на устройстве. Офлайн-ИИ и фоновое wake-word пока не подключены.")
+
+                Text("Локальные списки и память работают без сети. Полноценный офлайн-ИИ пока не подключён.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
-            .padding().navigationTitle("JARVIS 2")
+            .padding()
+            .navigationTitle("JARVIS 2")
             .sheet(isPresented: $showingVoiceCapture) { VoiceCaptureView() }
             .onAppear { consumeVoiceRequest() }
             .onChange(of: openVoiceCapture) { requested in
                 if requested { consumeVoiceRequest() }
             }
         }
+    }
+
+    private func consumeVoiceRequest() {
+        guard openVoiceCapture else { return }
+        openVoiceCapture = false
+        showingVoiceCapture = true
     }
 }
