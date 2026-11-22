@@ -34,6 +34,14 @@ struct JarvisHomeView: View {
                     Label("Позвать JARVIS", systemImage: "mic.fill")
                         .font(.headline).frame(maxWidth: .infinity).padding()
                 }.buttonStyle(.borderedProminent)
+
+                NavigationLink {
+                    JarvisWorkspaceView()
+                } label: {
+                    Label("Мои списки", systemImage: "list.bullet.rectangle")
+                        .frame(maxWidth: .infinity).padding()
+                }
+                .buttonStyle(.bordered)
                 Text("Локальная очередь команд сохраняется на устройстве. Офлайн-ИИ и фоновое wake-word пока не подключены.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
