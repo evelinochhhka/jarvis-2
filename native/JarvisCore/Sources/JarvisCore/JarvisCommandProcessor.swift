@@ -20,10 +20,15 @@ public actor JarvisCommandProcessor {
 
     public func process(_ transcript: String) async throws -> JarvisProcessingResult {
         let parsed = parser.parse(transcript)
-        guard !parsed.text.isEmpty else { throw ProcessingError.emptyInput }
+        return try await process(kind: parsed.kind, text: parsed.text)
+    }
 
-        let command = try await queue.enqueue(kind: parsed.kind, text: parsed.text)
-        guard let list = Self.destination(for: parsed.kind) else {
+    public func process(kind: JarvisCommandKind, text: String) async throws -> JarvisProcessingResult {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { throw ProcessingError.emptyInput }
+
+        let command = try await queue.enqueue(kind: kind, text: cleaned)
+        guard let list = Self.destination(for: kind) else {
             return .requiresAI(commandID: command.id, prompt: command.text)
         }
 
