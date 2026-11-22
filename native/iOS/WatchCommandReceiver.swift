@@ -4,15 +4,24 @@ import JarvisCore
 
 private actor WatchPayloadLedger {
     private let key = "jarvis2.watch.processedPayloadIDs"
+    private var inFlight = Set<String>()
 
-    func contains(_ id: String) -> Bool {
-        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(id)
+    func begin(_ id: String) -> Bool {
+        let processed = UserDefaults.standard.stringArray(forKey: key) ?? []
+        guard !processed.contains(id), !inFlight.contains(id) else { return false }
+        inFlight.insert(id)
+        return true
     }
 
     func markProcessed(_ id: String) {
+        inFlight.remove(id)
         var ids = UserDefaults.standard.stringArray(forKey: key) ?? []
         ids.append(id)
         UserDefaults.standard.set(Array(ids.suffix(500)), forKey: key)
+    }
+
+    func release(_ id: String) {
+        inFlight.remove(id)
     }
 }
 
@@ -56,7 +65,7 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
         }
 
         Task {
-            if await payloadLedger.contains(payloadID) {
+            guard await payloadLedger.begin(payloadID) else {
                 replyHandler?(["accepted": true, "state": "duplicate"])
                 return
             }
@@ -76,6 +85,7 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
                                    "commandID": commandID.uuidString])
                 }
             } catch {
+                await payloadLedger.release(payloadID)
                 replyHandler?(["accepted": false, "reason": "Could not process command"])
             }
         }
