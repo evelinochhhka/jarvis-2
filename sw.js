@@ -1,6 +1,5 @@
-const CACHE_NAME = "jarvis-2-v1";
-
-const FILES_TO_CACHE = [
+const CACHE_NAME = "jarvis-2-v2";
+const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.json"
@@ -8,7 +7,7 @@ const FILES_TO_CACHE = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(FILES_TO_CACHE))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
   );
   self.skipWaiting();
 });
@@ -18,7 +17,7 @@ self.addEventListener("activate", event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME)
+          .filter(key => key.startsWith("jarvis-2-") && key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
     )
@@ -27,11 +26,45 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.includes("/api/")) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put("./index.html", copy));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match("./index.html");
+          return cached || Response.error();
+        })
+    );
+    return;
+  }
+
+  const isAppAsset = ["script", "style", "image", "font"].includes(request.destination);
+  if (!isAppAsset) return;
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      return cached || fetch(event.request);
+    caches.match(request).then(async cached => {
+      if (cached) return cached;
+
+      const response = await fetch(request);
+      if (response.ok && response.type === "basic") {
+        const copy = response.clone();
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, copy);
+      }
+      return response;
     })
   );
 });
