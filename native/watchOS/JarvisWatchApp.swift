@@ -28,12 +28,12 @@ struct WatchHomeView: View {
                 .disabled(commandText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Button("Новая заметка") {
-                    bridge.sendQuickCommand(kind: "note", text: "Новая заметка")
-                    lastQueuedMessage = "Заметка отправлена на iPhone"
+                    commandText = "Запиши заметку: "
+                    lastQueuedMessage = "Продиктуйте текст заметки и нажмите «Отправить»."
                 }
-                Button("Напоминание") {
-                    bridge.sendQuickCommand(kind: "reminder", text: "Новое напоминание")
-                    lastQueuedMessage = "Напоминание отправлено на iPhone"
+                Button("Новое напоминание") {
+                    commandText = "Напомни мне "
+                    lastQueuedMessage = "Продиктуйте текст напоминания и нажмите «Отправить»."
                 }
 
                 if let lastQueuedMessage {
