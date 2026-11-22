@@ -1,5 +1,9 @@
 name: Swift native core and app builds
+concurrency:
+  group: native-builds-${{ github.ref }}
+  cancel-in-progress: true
 on:
+  workflow_dispatch:
   push:
     branches: [foundation/architecture]
     paths:
