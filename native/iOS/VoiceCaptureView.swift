@@ -39,9 +39,11 @@ struct VoiceCaptureView: View {
                     .font(.system(size: 64))
                 Text(recognizer.transcript.isEmpty ? "Нажмите кнопку и произнесите команду" : recognizer.transcript)
                     .multilineTextAlignment(.center).padding()
-                Button(recognizer.isListening ? "Остановить" : "Начать запись") {
+                Button(recognizer.isListening ? "Остановить" : recognizer.isPreparing ? "Подготовка…" : "Начать запись") {
                     recognizer.isListening ? recognizer.stop() : recognizer.start(localeIdentifier: selectedLanguage.rawValue)
-                }.buttonStyle(.borderedProminent)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(recognizer.isPreparing)
 
                 Button("Передать команду JARVIS") {
                     saveRecognizedCommand()
@@ -64,6 +66,7 @@ struct VoiceCaptureView: View {
             .padding().navigationTitle("Голосовой ввод")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Закрыть") { dismiss() } } }
             .onAppear { recognizer.start(localeIdentifier: selectedLanguage.rawValue) }
+            .onDisappear { recognizer.stop() }
         }
     }
 
