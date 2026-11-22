@@ -45,6 +45,9 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
                 case let .saved(list, entryID):
                     replyHandler?(["accepted": true, "state": "saved",
                                    "list": list.rawValue, "entryID": entryID.uuidString])
+                case let .savedReminderNeedsSchedule(entryID):
+                    replyHandler?(["accepted": true, "state": "saved_needs_schedule",
+                                   "entryID": entryID.uuidString])
                 case let .requiresAI(commandID, _):
                     replyHandler?(["accepted": true, "state": "waiting_for_ai",
                                    "commandID": commandID.uuidString])
