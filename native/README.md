@@ -30,3 +30,16 @@
 - Локальная история диалогов и отдельное хранилище памяти с явным добавлением, обновлением и удалением записей уже реализованы. Есть интерфейс JarvisAIEngine для будущего локального или удалённого движка, но ни один движок пока не подключён. Синтез речи, защищённое хранение, аутентификация и полноценная синхронизация ещё впереди.
 - Доступность on-device Speech зависит от языка, устройства и версии ОС.
 - Не использовать private API, обходы ограничений, скрытую запись или передачу секретов в клиентский код.
+
+## Генерация Xcode-проекта и сборка
+
+В native/project.yml описаны iOS/iPadOS и watchOS targets, локальный пакет JarvisCore и privacy descriptions. На Mac с установленными Xcode и XcodeGen выполните из корня репозитория:
+
+```sh
+brew install xcodegen
+xcodegen generate --spec native/project.yml --project native/JARVIS2.xcodeproj
+xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2 -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2Watch -sdk watchsimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+```
+
+GitHub Actions выполняет эти сборки автоматически. Simulator build не заменяет установку на физические устройства, настройку подписания, pairing и проверку разрешений.
