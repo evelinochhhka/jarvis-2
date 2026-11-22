@@ -99,6 +99,12 @@ public actor JarvisConversationStore {
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try JSONEncoder.jarvisConversation.encode(messages).write(to: fileURL, options: .atomic)
+            #if os(iOS) || os(watchOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: fileURL.path
+            )
+            #endif
         } catch {
             throw ConversationError.persistenceFailed
         }
