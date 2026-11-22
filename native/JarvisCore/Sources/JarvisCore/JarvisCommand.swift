@@ -1,6 +1,6 @@
 import Foundation
 
-public enum JarvisCommandKind: String, Codable, Sendable {
+public enum JarvisCommandKind: String, Codable, Sendable, Equatable {
     case note, reminder, addTask, addToWatchlist, addToWishlist, ask
 }
 
