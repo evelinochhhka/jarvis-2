@@ -5,6 +5,7 @@ import {
   updateItem
 } from "../features/lists/list-store.js";
 import { sendChatMessage } from "../services/api/client.js";
+import { renderCommunications } from "../features/communications/communications.js";
 
 const dashboard = document.querySelector(".dashboard");
 const navButtons = [...document.querySelectorAll(".nav-item[data-view]")];
@@ -18,7 +19,8 @@ const views = {
   wishlist: "Мои хотелки",
   reminders: "Напоминания",
   files: "Файлы",
-  settings: "Настройки"
+  settings: "Настройки",
+  communications: "Связь и уведомления"
 };
 
 const listConfig = {
@@ -386,7 +388,9 @@ function navigate(view) {
     dashboard.replaceChildren(
       view === "chat"
         ? renderChat()
-        : listConfig[view]
+        : view === "communications"
+          ? renderCommunications()
+          : listConfig[view]
           ? renderList(view)
           : renderPlaceholder(view)
     );
@@ -401,6 +405,20 @@ function navigate(view) {
 function initialize() {
   if (!dashboard) return;
   addStyles();
+  const sidebar = document.querySelector(".sidebar");
+  const systemLabel = [...(sidebar?.querySelectorAll(".nav-label") || [])].at(-1);
+  if (sidebar && systemLabel && !document.querySelector('[data-view="communications"]')) {
+    const communicationsButton = element("button", "nav-item");
+    communicationsButton.type = "button";
+    communicationsButton.dataset.view = "communications";
+    communicationsButton.append(
+      element("span", "nav-icon", "◉"),
+      document.createTextNode(" Связь и уведомления")
+    );
+    sidebar.insertBefore(communicationsButton, systemLabel);
+    navButtons.push(communicationsButton);
+  }
+
   navButtons.forEach((button) => {
     button.addEventListener("click", () => navigate(button.dataset.view));
   });
