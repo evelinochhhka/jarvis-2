@@ -101,7 +101,8 @@ test("OpenAI-compatible adapter sends the bilingual system prompt and parses con
   const reply = await provider.generateReply({
     message: "Привет",
     language: "auto",
-    preferredLanguage: "ru"
+    preferredLanguage: "ru",
+    history: [{ role: "user", content: "Попередній контекст" }]
   });
   assert.equal(reply, "Ответ модели");
   assert.equal(captured.url, "https://provider.invalid/v1/chat/completions");
