@@ -1,10 +1,15 @@
 import SwiftUI
 import Speech
 import AVFoundation
+import JarvisCore
 
 struct VoiceCaptureView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recognizer = OnDeviceSpeechCapture()
+    @State private var queueMessage: String?
+    @State private var queueError: String?
+    private let parser = JarvisCommandParser()
+    private let queue = CommandQueueStore()
 
     var body: some View {
         NavigationStack {
@@ -16,14 +21,41 @@ struct VoiceCaptureView: View {
                 Button(recognizer.isListening ? "Остановить" : "Начать запись") {
                     recognizer.isListening ? recognizer.stop() : recognizer.start()
                 }.buttonStyle(.borderedProminent)
+
+                Button("Передать команду JARVIS") {
+                    saveRecognizedCommand()
+                }
+                .buttonStyle(.bordered)
+                .disabled(recognizer.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if let queueMessage {
+                    Text(queueMessage).font(.footnote).foregroundStyle(.green)
+                }
+                if let queueError {
+                    Text(queueError).font(.footnote).foregroundStyle(.red)
+                }
                 if let error = recognizer.errorMessage {
                     Text(error).font(.footnote).foregroundStyle(.red)
                 }
-                Text("Работает только при поддержке локального распознавания выбранного языка. При отсутствии on-device поддержки запись не переключается в облако.")
+                Text("Распознавание выполняется локально, если выбранный язык поддерживается устройством. Команда сохраняется в очередь, но пока не исполняется языковой моделью.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding().navigationTitle("Голосовой ввод")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Закрыть") { dismiss() } } }
+        }
+    }
+
+    private func saveRecognizedCommand() {
+        let command = parser.parse(recognizer.transcript)
+        Task {
+            do {
+                let saved = try await queue.enqueue(kind: command.kind, text: command.text)
+                queueMessage = "Команда добавлена в очередь: \(saved.kind.rawValue). Выполнение ещё не подключено."
+                queueError = nil
+            } catch {
+                queueError = "Не удалось сохранить команду."
+                queueMessage = nil
+            }
         }
     }
 }
@@ -40,6 +72,7 @@ final class OnDeviceSpeechCapture: ObservableObject {
 
     func start() {
         stop()
+        transcript = ""
         errorMessage = nil
         let code = Locale.current.language.languageCode?.identifier == "uk" ? "uk-UA" : "ru-RU"
         guard let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: code)),
