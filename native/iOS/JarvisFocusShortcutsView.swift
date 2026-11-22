@@ -1,25 +1,31 @@
 import SwiftUI
 import UIKit
 
+private struct JarvisFocusShortcut: Identifiable {
+    let title: String
+    let name: String
+    var id: String { name }
+}
+
 struct JarvisFocusShortcutsView: View {
     @State private var statusMessage = "Для каждого режима заранее создайте команду в приложении «Команды» с действием «Установить фокус»."
     private let shortcuts = [
-        ("Не беспокоить", "JARVIS - Не беспокоить"),
-        ("Сон", "JARVIS - Сон"),
-        ("Учёба", "JARVIS - Учёба"),
-        ("Личное", "JARVIS - Личное"),
-        ("Выключить фокусирование", "JARVIS - Выключить фокусирование")
+        JarvisFocusShortcut(title: "Не беспокоить", name: "JARVIS - Не беспокоить"),
+        JarvisFocusShortcut(title: "Сон", name: "JARVIS - Сон"),
+        JarvisFocusShortcut(title: "Учёба", name: "JARVIS - Учёба"),
+        JarvisFocusShortcut(title: "Личное", name: "JARVIS - Личное"),
+        JarvisFocusShortcut(title: "Выключить фокусирование", name: "JARVIS - Выключить фокусирование")
     ]
 
     var body: some View {
         List {
             Section("Режимы") {
-                ForEach(shortcuts, id: \.1) { item in
+                ForEach(shortcuts) { item in
                     Button {
-                        launchShortcut(named: item.1)
+                        launchShortcut(named: item.name)
                     } label: {
                         HStack {
-                            Text(item.0)
+                            Text(item.title)
                             Spacer()
                             Image(systemName: "arrow.up.right")
                                 .foregroundStyle(.secondary)
