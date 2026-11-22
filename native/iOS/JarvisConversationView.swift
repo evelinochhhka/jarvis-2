@@ -2,12 +2,17 @@ import SwiftUI
 import JarvisCore
 
 struct JarvisConversationView: View {
-    @State private var conversationID = UUID()
+    @AppStorage("jarvis2.currentConversationID") private var conversationIDString = ""
     @State private var history: [JarvisConversationMessage] = []
     @State private var draft = ""
     @State private var statusMessage: String?
     @State private var isSending = false
+    @State private var showDeleteConfirmation = false
     private let service = JarvisConversationService()
+
+    private var conversationID: UUID {
+        UUID(uuidString: conversationIDString) ?? UUID()
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -55,15 +60,31 @@ struct JarvisConversationView: View {
             .padding(.bottom, 8)
         }
         .navigationTitle("Диалог")
-        .task { await reload() }
+        .task {
+            if conversationIDString.isEmpty {
+                conversationIDString = UUID().uuidString
+            }
+            await reload()
+        }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button("Новый") {
-                    conversationID = UUID()
+                    conversationIDString = UUID().uuidString
                     history = []
                     statusMessage = nil
                 }
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .accessibilityLabel("Удалить текущую беседу")
             }
+        }
+        .confirmationDialog("Удалить текущую беседу?", isPresented: $showDeleteConfirmation,
+                            titleVisibility: .visible) {
+            Button("Удалить беседу", role: .destructive) { deleteCurrentConversation() }
+            Button("Отмена", role: .cancel) {}
         }
     }
 
@@ -78,12 +99,13 @@ struct JarvisConversationView: View {
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        let activeConversationID = conversationID
         draft = ""
         isSending = true
         statusMessage = nil
         Task {
             do {
-                let result = try await service.send(text, conversationID: conversationID)
+                let result = try await service.send(text, conversationID: activeConversationID)
                 await reload()
                 switch result {
                 case .reply:
@@ -95,6 +117,20 @@ struct JarvisConversationView: View {
                 statusMessage = "Не удалось сохранить сообщение."
             }
             isSending = false
+        }
+    }
+
+    private func deleteCurrentConversation() {
+        let activeConversationID = conversationID
+        Task {
+            do {
+                try await service.deleteConversation(id: activeConversationID)
+                history = []
+                conversationIDString = UUID().uuidString
+                statusMessage = "Беседа удалена."
+            } catch {
+                statusMessage = "Не удалось удалить беседу."
+            }
         }
     }
 }
