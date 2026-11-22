@@ -1,0 +1,71 @@
+name: JARVIS2
+options:
+  bundleIdPrefix: com.jarvis2
+  deploymentTarget:
+    iOS: "16.0"
+    watchOS: "9.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  JarvisCore:
+    path: JarvisCore
+
+targets:
+  JARVIS2:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS
+        excludes:
+          - Info.plist
+    dependencies:
+      - package: JarvisCore
+        product: JarvisCore
+    info:
+      path: iOS/Generated-Info.plist
+      properties:
+        NSMicrophoneUsageDescription: "JARVIS использует микрофон только после явного запуска голосового ввода."
+        NSSpeechRecognitionUsageDescription: "JARVIS преобразует речь в текст для обработки команды на устройстве."
+        CFBundleDisplayName: "JARVIS 2"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jarvis2.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGNING_ALLOWED: "NO"
+
+  JARVIS2Watch:
+    type: application.watchapp2
+    platform: watchOS
+    sources:
+      - path: watchOS
+        excludes:
+          - Info.plist
+    dependencies:
+      - package: JarvisCore
+        product: JarvisCore
+    info:
+      path: watchOS/Generated-Info.plist
+      properties:
+        CFBundleDisplayName: "JARVIS"
+        WKCompanionAppBundleIdentifier: "com.jarvis2.app"
+        WKWatchKitApp: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jarvis2.app.watchkitapp
+        TARGETED_DEVICE_FAMILY: "4"
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: "YES"
+        CODE_SIGNING_ALLOWED: "NO"
+
+schemes:
+  JARVIS2:
+    build:
+      targets:
+        JARVIS2: all
+  JARVIS2Watch:
+    build:
+      targets:
+        JARVIS2Watch: all
