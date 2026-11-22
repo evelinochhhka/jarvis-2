@@ -28,8 +28,18 @@ final class WatchCommandBridge: NSObject, ObservableObject, WCSessionDelegate {
         if session.isReachable {
             session.sendMessage(payload, replyHandler: { [weak self] reply in
                 DispatchQueue.main.async {
-                    self?.status = reply["accepted"] as? Bool == true
-                        ? "Команда принята iPhone" : "iPhone не подтвердил команду"
+                    guard reply["accepted"] as? Bool == true else {
+                        self?.status = "iPhone не смог сохранить команду"
+                        return
+                    }
+                    switch reply["state"] as? String {
+                    case "saved":
+                        self?.status = "Сохранено на iPhone"
+                    case "waiting_for_ai":
+                        self?.status = "Запрос сохранён, ожидает подключения ИИ"
+                    default:
+                        self?.status = "iPhone принял команду"
+                    }
                 }
             }, errorHandler: { [weak self] error in
                 DispatchQueue.main.async {
