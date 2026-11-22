@@ -3,9 +3,23 @@ import Speech
 import AVFoundation
 import JarvisCore
 
+private enum JarvisSpeechLanguage: String, CaseIterable, Identifiable {
+    case russian = "ru-RU"
+    case ukrainian = "uk-UA"
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .russian: return "Русский"
+        case .ukrainian: return "Українська"
+        }
+    }
+}
+
 struct VoiceCaptureView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recognizer = OnDeviceSpeechCapture()
+    @State private var selectedLanguage: JarvisSpeechLanguage = Locale.current.language.languageCode?.identifier == "uk" ? .ukrainian : .russian
     @State private var queueMessage: String?
     @State private var queueError: String?
     private let parser = JarvisCommandParser()
@@ -14,12 +28,20 @@ struct VoiceCaptureView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 18) {
+                Picker("Язык распознавания", selection: $selectedLanguage) {
+                    ForEach(JarvisSpeechLanguage.allCases) { language in
+                        Text(language.title).tag(language)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(recognizer.isListening)
+
                 Image(systemName: recognizer.isListening ? "waveform.circle.fill" : "mic.circle")
                     .font(.system(size: 64))
                 Text(recognizer.transcript.isEmpty ? "Нажмите кнопку и произнесите команду" : recognizer.transcript)
                     .multilineTextAlignment(.center).padding()
                 Button(recognizer.isListening ? "Остановить" : "Начать запись") {
-                    recognizer.isListening ? recognizer.stop() : recognizer.start()
+                    recognizer.isListening ? recognizer.stop() : recognizer.start(localeIdentifier: selectedLanguage.rawValue)
                 }.buttonStyle(.borderedProminent)
 
                 Button("Передать команду JARVIS") {
@@ -37,7 +59,7 @@ struct VoiceCaptureView: View {
                 if let error = recognizer.errorMessage {
                     Text(error).font(.footnote).foregroundStyle(.red)
                 }
-                Text("Распознавание выполняется локально, если выбранный язык поддерживается устройством. Команда сохраняется в очередь, но пока не исполняется языковой моделью.")
+                Text("Выберите русский или украинский. Офлайн-распознавание доступно только если iOS поддерживает его для выбранного языка на этом устройстве. Команда сохраняется локально, но пока не исполняется ИИ.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding().navigationTitle("Голосовой ввод")
@@ -70,12 +92,11 @@ final class OnDeviceSpeechCapture: ObservableObject {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
 
-    func start() {
+    func start(localeIdentifier: String) {
         stop()
         transcript = ""
         errorMessage = nil
-        let code = Locale.current.language.languageCode?.identifier == "uk" ? "uk-UA" : "ru-RU"
-        guard let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: code)),
+        guard let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)),
               speechRecognizer.isAvailable else {
             errorMessage = "Распознавание для выбранного языка сейчас недоступно."
             return
