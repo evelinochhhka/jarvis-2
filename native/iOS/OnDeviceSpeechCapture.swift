@@ -6,24 +6,37 @@ import Speech
 final class OnDeviceSpeechCapture: ObservableObject {
     @Published private(set) var transcript = ""
     @Published private(set) var isListening = false
+    @Published private(set) var isPreparing = false
     @Published private(set) var errorMessage: String?
 
     private let audioEngine = AVAudioEngine()
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private var captureGeneration: UUID?
 
     func start(localeIdentifier: String) {
-        guard !isListening else { return }
+        guard !isListening, !isPreparing else { return }
         transcript = ""
         errorMessage = nil
-        Task { await beginCapture(localeIdentifier: localeIdentifier) }
+        isPreparing = true
+        let generation = UUID()
+        captureGeneration = generation
+        Task {
+            await beginCapture(localeIdentifier: localeIdentifier, generation: generation)
+            if captureGeneration == generation {
+                isPreparing = false
+            }
+        }
     }
 
     func stop() {
-        guard isListening || audioEngine.isRunning else { return }
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        captureGeneration = nil
+        isPreparing = false
+        if audioEngine.isRunning {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionTask = nil
@@ -32,14 +45,16 @@ final class OnDeviceSpeechCapture: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    private func beginCapture(localeIdentifier: String) async {
+    private func beginCapture(localeIdentifier: String, generation: UUID) async {
         let speechStatus = await requestSpeechAuthorization()
+        guard captureGeneration == generation else { return }
         guard speechStatus == .authorized else {
             errorMessage = "Разрешите распознавание речи в настройках iPhone."
             return
         }
 
         let microphoneGranted = await requestMicrophonePermission()
+        guard captureGeneration == generation else { return }
         guard microphoneGranted else {
             errorMessage = "Разрешите доступ к микрофону в настройках iPhone."
             return
@@ -54,6 +69,7 @@ final class OnDeviceSpeechCapture: ObservableObject {
             errorMessage = "Для выбранного языка недоступно офлайн-распознавание на этом устройстве."
             return
         }
+        guard captureGeneration == generation else { return }
 
         speechRecognizer = recognizer
         do {
@@ -75,10 +91,15 @@ final class OnDeviceSpeechCapture: ObservableObject {
 
             audioEngine.prepare()
             try audioEngine.start()
+            guard captureGeneration == generation else {
+                stop()
+                return
+            }
             isListening = true
 
             recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                 Task { @MainActor in
+                    guard self?.captureGeneration == generation else { return }
                     if let result {
                         self?.transcript = result.bestTranscription.formattedString
                     }
@@ -91,7 +112,14 @@ final class OnDeviceSpeechCapture: ObservableObject {
                 }
             }
         } catch {
-            stop()
+            if audioEngine.isRunning {
+                audioEngine.stop()
+                audioEngine.inputNode.removeTap(onBus: 0)
+            }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            recognitionRequest = nil
+            recognitionTask = nil
+            isListening = false
             errorMessage = "Не удалось запустить микрофон: \(error.localizedDescription)"
         }
     }
