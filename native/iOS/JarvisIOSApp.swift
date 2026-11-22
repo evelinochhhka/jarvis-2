@@ -30,6 +30,14 @@ struct JarvisHomeView: View {
                 Text("JARVIS").font(.largeTitle.weight(.semibold))
                 Text("Голосовой запуск доступен по явному действию. Для запуска без открытия интерфейса используйте Siri Shortcut или App Intent.")
                     .multilineTextAlignment(.center).foregroundStyle(.secondary)
+                NavigationLink {
+                    JarvisConversationView()
+                } label: {
+                    Label("Диалог", systemImage: "message")
+                        .frame(maxWidth: .infinity).padding()
+                }
+                .buttonStyle(.bordered)
+
                 Button { showingVoiceCapture = true } label: {
                     Label("Позвать JARVIS", systemImage: "mic.fill")
                         .font(.headline).frame(maxWidth: .infinity).padding()
