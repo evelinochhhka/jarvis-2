@@ -28,7 +28,7 @@ struct WatchHomeView: View {
                 .disabled(commandText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Button("Новая заметка") {
-                    commandText = "Запиши заметку: "
+                    commandText = "Запиши: "
                     lastQueuedMessage = "Продиктуйте текст заметки и нажмите «Отправить»."
                 }
                 Button("Новое напоминание") {
