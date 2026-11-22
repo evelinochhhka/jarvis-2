@@ -1,6 +1,6 @@
 import Foundation
 
-public enum JarvisWorkspaceList: String, Codable, Sendable, CaseIterable, Equatable {
+public enum JarvisWorkspaceList: String, Codable, Sendable, CaseIterable, Equatable, Hashable {
     case notes
     case reminders
     case tasks
