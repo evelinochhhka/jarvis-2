@@ -1,19 +1,33 @@
-name: Swift native core
+name: Swift native core and app builds
 on:
   push:
     branches: [foundation/architecture]
     paths:
-      - "native/JarvisCore/**"
+      - "native/**"
       - ".github/workflows/swift.yml"
   pull_request:
     branches: [main]
     paths:
-      - "native/JarvisCore/**"
+      - "native/**"
       - ".github/workflows/swift.yml"
+
 jobs:
-  test:
+  core-tests:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run JarvisCore tests
         run: swift test --package-path native/JarvisCore
+
+  app-builds:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate --spec native/project.yml --project native/JARVIS2.xcodeproj
+      - name: Build iOS simulator app
+        run: xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2 -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+      - name: Build watchOS simulator app
+        run: xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2Watch -sdk watchsimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
