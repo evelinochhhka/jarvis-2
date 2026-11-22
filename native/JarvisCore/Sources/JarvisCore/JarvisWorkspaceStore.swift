@@ -18,20 +18,49 @@ public enum JarvisWorkspaceList: String, Codable, Sendable, CaseIterable, Equata
     }
 }
 
+public enum JarvisReminderRepeat: String, Codable, Sendable, CaseIterable, Equatable {
+    case none
+    case daily
+    case weekly
+    case monthly
+
+    public var title: String {
+        switch self {
+        case .none: return "Без повтора"
+        case .daily: return "Каждый день"
+        case .weekly: return "Каждую неделю"
+        case .monthly: return "Каждый месяц"
+        }
+    }
+}
+
+public struct JarvisReminderSchedule: Codable, Sendable, Equatable {
+    public let date: Date
+    public let repeatFrequency: JarvisReminderRepeat
+
+    public init(date: Date, repeatFrequency: JarvisReminderRepeat = .none) {
+        self.date = date
+        self.repeatFrequency = repeatFrequency
+    }
+}
+
 public struct JarvisWorkspaceEntry: Codable, Identifiable, Sendable, Equatable {
     public let id: UUID
     public let list: JarvisWorkspaceList
     public let title: String
     public let createdAt: Date
     public var isCompleted: Bool
+    public var reminder: JarvisReminderSchedule?
 
     public init(id: UUID = UUID(), list: JarvisWorkspaceList, title: String,
-                createdAt: Date = .now, isCompleted: Bool = false) {
+                createdAt: Date = .now, isCompleted: Bool = false,
+                reminder: JarvisReminderSchedule? = nil) {
         self.id = id
         self.list = list
         self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.createdAt = createdAt
         self.isCompleted = isCompleted
+        self.reminder = reminder
     }
 }
 
@@ -50,9 +79,10 @@ public actor JarvisWorkspaceStore {
     }
 
     @discardableResult
-    public func add(to list: JarvisWorkspaceList, title: String) throws -> JarvisWorkspaceEntry {
+    public func add(to list: JarvisWorkspaceList, title: String,
+                    reminder: JarvisReminderSchedule? = nil) throws -> JarvisWorkspaceEntry {
         try loadIfNeeded()
-        let entry = JarvisWorkspaceEntry(list: list, title: title)
+        let entry = JarvisWorkspaceEntry(list: list, title: title, reminder: list == .reminders ? reminder : nil)
         guard !entry.title.isEmpty else { throw WorkspaceError.emptyTitle }
         entries.append(entry)
         try persist()
