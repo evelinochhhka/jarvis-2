@@ -105,7 +105,7 @@ public actor JarvisWorkspaceStore {
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try JSONEncoder.jarvisWorkspace.encode(entries).write(to: fileURL, options: .atomic)
-            #if os(iOS) || os(watchOS)
+            #if os(iOS)
             try FileManager.default.setAttributes(
                 [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
                 ofItemAtPath: fileURL.path
