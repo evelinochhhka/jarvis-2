@@ -189,12 +189,26 @@ function renderList(type) {
       }
 
       const actions = element("div", "module-actions");
+      const edit = element("button", "module-button", "Изменить");
+      edit.type = "button";
+      edit.addEventListener("click", () => {
+        const nextTitle = window.prompt("Новое название:", item.title);
+        if (nextTitle === null) return;
+        const nextNote = window.prompt("Заметка:", item.note || "");
+        if (nextNote === null) return;
+        try {
+          updateItem(type, item.id, { title: nextTitle, note: nextNote });
+          refresh();
+        } catch (error) {
+          window.alert(error.message || "Не удалось изменить элемент.");
+        }
+      });
       const remove = element("button", "module-button danger", "Удалить");
       remove.type = "button";
       remove.addEventListener("click", () => {
         if (deleteItem(type, item.id)) refresh();
       });
-      actions.append(remove);
+      actions.append(edit, remove);
       row.append(checkbox, main, actions);
       list.append(row);
     }
@@ -267,13 +281,92 @@ function renderChat() {
   return shell;
 }
 
+function renderSettings() {
+  const shell = createModuleShell("Настройки", "Локальные данные JARVIS 2 и резервное копирование.");
+  const panel = element("section", "panel");
+  panel.append(element("div", "panel-title", "РЕЗЕРВНАЯ КОПИЯ"));
+
+  const description = element("p", "module-description",
+    "Экспорт сохранит все четыре списка в JSON-файл. Импорт заменит текущие локальные списки данными из выбранной копии."
+  );
+  panel.append(description);
+
+  const toolbar = element("div", "module-toolbar");
+  const exportButton = element("button", "module-button", "Экспортировать данные");
+  exportButton.type = "button";
+  exportButton.addEventListener("click", () => {
+    try {
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        lists: {
+          tasks: getItems("tasks"),
+          watchlist: getItems("watchlist"),
+          wishlist: getItems("wishlist"),
+          reminders: getItems("reminders")
+        }
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = element("a");
+      anchor.href = url;
+      anchor.download = `jarvis-2-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error.message || "Не удалось создать резервную копию.");
+    }
+  });
+
+  const importLabel = element("label", "module-button", "Импортировать копию");
+  importLabel.style.display = "inline-flex";
+  importLabel.style.alignItems = "center";
+  importLabel.style.cursor = "pointer";
+  const fileInput = element("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/json,.json";
+  fileInput.hidden = true;
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!window.confirm("Импорт заменит все текущие локальные списки. Продолжить?")) {
+        fileInput.value = "";
+        return;
+      }
+      const { importAllLists } = await import("../features/lists/list-store.js");
+      importAllLists(parsed);
+      window.alert("Резервная копия восстановлена.");
+    } catch (error) {
+      window.alert(error.message || "Не удалось прочитать резервную копию.");
+    } finally {
+      fileInput.value = "";
+    }
+  });
+  importLabel.append(fileInput);
+  toolbar.append(exportButton, importLabel);
+  panel.append(toolbar);
+  panel.append(element("p", "module-notice",
+    "Файл резервной копии содержит ваши личные записи. Храните его в безопасном месте и не публикуйте."
+  ));
+  shell.append(panel);
+
+  const status = element("section", "panel");
+  status.style.marginTop = "14px";
+  status.append(element("div", "panel-title", "СОСТОЯНИЕ СИСТЕМЫ"));
+  status.append(element("div", "system-row", "Локальное хранилище: активно"));
+  status.append(element("div", "system-row", "Синхронизация между устройствами: не подключена"));
+  status.append(element("div", "system-row", "ИИ и голос: не подключены"));
+  shell.append(status);
+  return shell;
+}
+
 function renderPlaceholder(view) {
-  const titles = {
-    files: ["Файлы", "Модуль файлов ещё не реализован."],
-    settings: ["Настройки", "Настройки ассистента будут добавлены после подключения основных модулей."]
-  };
-  const [title, description] = titles[view];
-  const shell = createModuleShell(title, description);
+  if (view === "settings") return renderSettings();
+  const shell = createModuleShell("Файлы", "Модуль файлов ещё не реализован.");
   shell.append(element("div", "module-empty", "Этот раздел пока находится в разработке."));
   return shell;
 }
