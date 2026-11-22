@@ -246,9 +246,39 @@ function renderList(type) {
 }
 
 function renderChat() {
-  const shell = createModuleShell("Диалог", "Текстовый канал связи с ассистентом. Серверная модель пока не подключена.");
+  const shell = createModuleShell("Диалог", "История диалога сохраняется локально на этом устройстве. Ответы ИИ требуют настроенного сервера.");
   const log = element("div", "chat-log");
-  log.append(element("div", "chat-message system", "ИИ пока не подключён. Когда сервер будет настроен, здесь появятся ответы. Сообщения не будут подменяться вымышленными ответами."));
+  const storageKey = "jarvis-2-chat-v1";
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+  } catch {
+    saved = null;
+  }
+  const conversationId = typeof saved?.conversationId === "string"
+    ? saved.conversationId
+    : globalThis.crypto?.randomUUID?.() || `conversation-${Date.now()}`;
+  let history = Array.isArray(saved?.history)
+    ? saved.history.filter((item) =>
+        item && ["user", "assistant"].includes(item.role)
+        && typeof item.content === "string" && item.content.trim()
+      ).slice(-30)
+    : [];
+
+  if (!history.length) {
+    log.append(element("div", "chat-message system",
+      "Здравствуйте. Диалог будет продолжаться с учётом последних сообщений. Если сервер или ИИ не настроен, я сообщу об этом прямо."
+    ));
+  } else {
+    for (const item of history) {
+      log.append(element(
+        "div",
+        `chat-message${item.role === "user" ? " user" : ""}`,
+        item.content
+      ));
+    }
+  }
+
   const form = element("form", "chat-form");
   const input = element("textarea", "module-textarea");
   input.placeholder = "Введите сообщение...";
@@ -262,15 +292,32 @@ function renderChat() {
     event.preventDefault();
     const message = input.value.trim();
     if (!message) return;
-    const userMessage = element("div", "chat-message user", message);
-    log.append(userMessage);
+    log.append(element("div", "chat-message user", message));
     input.value = "";
     send.disabled = true;
     send.textContent = "Отправка...";
     try {
       const clientRequestId = globalThis.crypto?.randomUUID?.() || `request-${Date.now()}`;
-      const result = await sendChatMessage({ message, clientRequestId });
-      log.append(element("div", "chat-message", result?.message?.content || "Сервер вернул пустой ответ."));
+      const result = await sendChatMessage({
+        message,
+        conversationId,
+        clientRequestId,
+        history: history.slice(-20)
+      });
+      const answer = result?.message?.content || "Сервер вернул пустой ответ.";
+      log.append(element("div", "chat-message", answer));
+      history = [
+        ...history,
+        { role: "user", content: message },
+        { role: "assistant", content: answer }
+      ].slice(-30);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ conversationId, history }));
+      } catch {
+        log.append(element("div", "chat-message system",
+          "Не удалось сохранить историю локально. Текущий диалог остаётся на экране."
+        ));
+      }
     } catch (error) {
       log.append(element("div", "chat-message system", error.message));
     } finally {
