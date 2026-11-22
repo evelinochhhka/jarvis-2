@@ -6,7 +6,10 @@ const APP_SHELL = [
   "./src/app/main.js",
   "./src/features/lists/list-store.js",
   "./src/services/storage/local-store.js",
-  "./src/services/api/client.js"
+  "./src/services/api/client.js",
+  "./src/features/communications/communications.js",
+  "./src/features/communications/push-client.js",
+  "./src/features/focus/focus-shortcuts.js"
 ];
 
 self.addEventListener("install", event => {
