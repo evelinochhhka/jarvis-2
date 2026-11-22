@@ -1,8 +1,12 @@
-const CACHE_NAME = "jarvis-2-v2";
+const CACHE_NAME = "jarvis-2-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./manifest.json"
+  "./manifest.json",
+  "./src/app/main.js",
+  "./src/features/lists/list-store.js",
+  "./src/services/storage/local-store.js",
+  "./src/services/api/client.js"
 ];
 
 self.addEventListener("install", event => {
