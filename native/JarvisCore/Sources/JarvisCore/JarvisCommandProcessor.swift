@@ -2,6 +2,7 @@ import Foundation
 
 public enum JarvisProcessingResult: Sendable, Equatable {
     case saved(list: JarvisWorkspaceList, entryID: UUID)
+    case savedReminderNeedsSchedule(entryID: UUID)
     case requiresAI(commandID: UUID, prompt: String)
 }
 
@@ -35,6 +36,9 @@ public actor JarvisCommandProcessor {
         do {
             let entry = try await workspace.add(to: list, title: command.text)
             try await queue.updateStatus(id: command.id, status: .completed)
+            if kind == .reminder {
+                return .savedReminderNeedsSchedule(entryID: entry.id)
+            }
             return .saved(list: list, entryID: entry.id)
         } catch {
             try? await queue.updateStatus(id: command.id, status: .failed)
