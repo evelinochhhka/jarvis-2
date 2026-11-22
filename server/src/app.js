@@ -20,20 +20,26 @@ function readJson(request, maxBytes) {
   return new Promise((resolve, reject) => {
     let body = "";
     let size = 0;
+    let tooLarge = false;
     request.setEncoding("utf8");
     request.on("data", (chunk) => {
+      if (tooLarge) return;
       size += Buffer.byteLength(chunk, "utf8");
       if (size > maxBytes) {
-        reject(Object.assign(new Error("Размер запроса превышает допустимый предел."), {
-          status: 413,
-          code: "REQUEST_TOO_LARGE"
-        }));
-        request.destroy();
+        tooLarge = true;
+        body = "";
         return;
       }
       body += chunk;
     });
     request.on("end", () => {
+      if (tooLarge) {
+        reject(Object.assign(new Error("Размер запроса превышает допустимый предел."), {
+          status: 413,
+          code: "REQUEST_TOO_LARGE"
+        }));
+        return;
+      }
       try {
         resolve(JSON.parse(body || "{}"));
       } catch {
