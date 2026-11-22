@@ -1,6 +1,6 @@
 import Foundation
 
-public enum JarvisMessageRole: String, Codable, Sendable {
+public enum JarvisMessageRole: String, Codable, Sendable, Equatable {
     case user
     case assistant
     case system
