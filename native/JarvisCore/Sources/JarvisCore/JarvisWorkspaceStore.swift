@@ -18,7 +18,7 @@ public enum JarvisWorkspaceList: String, Codable, Sendable, CaseIterable, Equata
     }
 }
 
-public enum JarvisReminderRepeat: String, Codable, Sendable, CaseIterable, Equatable {
+public enum JarvisReminderRepeat: String, Codable, Sendable, CaseIterable, Equatable, Hashable {
     case none
     case daily
     case weekly
