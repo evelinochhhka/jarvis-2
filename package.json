@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node --check src/app/main.js && node --check src/features/lists/list-store.js && node --check src/services/storage/local-store.js && node --check src/services/api/client.js"
+    "check": "node --check src/app/main.js && node --check src/features/lists/list-store.js && node --check src/services/storage/local-store.js && node --check src/services/api/client.js && node --check src/features/communications/push-client.js && node --check src/features/communications/communications.js"
   },
   "engines": {
     "node": ">=20"
