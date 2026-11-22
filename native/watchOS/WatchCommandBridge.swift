@@ -54,6 +54,8 @@ final class WatchCommandBridge: NSObject, ObservableObject, WCSessionDelegate {
                     switch reply["state"] as? String {
                     case "saved":
                         self?.status = "Сохранено на iPhone"
+                    case "duplicate":
+                        self?.status = "Эта команда уже была обработана"
                     case "saved_needs_schedule":
                         self?.status = "Напоминание сохранено. Дату и время задайте на iPhone."
                     case "waiting_for_ai":
