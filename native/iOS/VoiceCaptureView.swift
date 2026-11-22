@@ -63,6 +63,7 @@ struct VoiceCaptureView: View {
             }
             .padding().navigationTitle("Голосовой ввод")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Закрыть") { dismiss() } } }
+            .onAppear { recognizer.start(localeIdentifier: selectedLanguage.rawValue) }
         }
     }
 
