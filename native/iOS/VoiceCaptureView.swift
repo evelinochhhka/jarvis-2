@@ -73,6 +73,8 @@ struct VoiceCaptureView: View {
                 switch result {
                 case let .saved(list, _):
                     queueMessage = "Сохранено в раздел «\(list.title)»."
+                case .savedReminderNeedsSchedule:
+                    queueMessage = "Напоминание сохранено. Укажите дату и время в разделе «Мои списки», чтобы включить уведомление."
                 case .requiresAI:
                     queueMessage = "Запрос сохранён. Для ответа требуется подключить ИИ-модель."
                 }
