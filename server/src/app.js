@@ -69,6 +69,21 @@ function validateChatPayload(payload) {
   if (payload.preferredLanguage !== undefined && !["ru", "uk"].includes(payload.preferredLanguage)) {
     return { error: "Поле preferredLanguage должно быть ru или uk." };
   }
+  if (payload.history !== undefined) {
+    if (!Array.isArray(payload.history) || payload.history.length > 30) {
+      return { error: "История должна содержать не более 30 сообщений." };
+    }
+    for (const item of payload.history) {
+      if (!item || typeof item !== "object" || !["user", "assistant"].includes(item.role)
+          || typeof item.content !== "string" || !item.content.trim() || item.content.length > 6000) {
+        return { error: "Каждое сообщение истории должно содержать роль user/assistant и текст до 6000 символов." };
+      }
+    }
+  }
+  if (payload.conversationId !== undefined
+      && (typeof payload.conversationId !== "string" || payload.conversationId.length > 128)) {
+    return { error: "Некорректный conversationId." };
+  }
   return null;
 }
 
@@ -124,7 +139,8 @@ export function createAppServer({ config, provider }) {
         const content = await provider.generateReply({
           message: payload.message.trim(),
           language: payload.language || "auto",
-          preferredLanguage: payload.preferredLanguage || "ru"
+          preferredLanguage: payload.preferredLanguage || "ru",
+          history: payload.history || []
         });
 
         sendJson(response, 200, {
