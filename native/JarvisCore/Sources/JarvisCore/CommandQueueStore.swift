@@ -62,6 +62,12 @@ public actor CommandQueueStore {
                 at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true
             )
             try JSONEncoder.jarvis.encode(commands).write(to: fileURL, options: .atomic)
+            #if os(iOS) || os(watchOS)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: fileURL.path
+            )
+            #endif
         } catch { throw QueueError.persistenceFailed }
     }
 
