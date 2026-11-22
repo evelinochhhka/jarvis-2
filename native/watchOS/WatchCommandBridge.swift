@@ -79,7 +79,7 @@ final class WatchCommandBridge: NSObject, ObservableObject, WCSessionDelegate {
     private func enqueueLocally(_ payload: [String: Any]) {
         var pending = UserDefaults.standard.array(forKey: pendingQueueKey) as? [[String: Any]] ?? []
         pending.append(payload)
-        UserDefaults.standard.set(pending, forKey: pendingQueueKey)
+        UserDefaults.standard.set(Array(pending.suffix(100)), forKey: pendingQueueKey)
     }
 
     private func flushLocalQueue(using session: WCSession) {
