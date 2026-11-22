@@ -3,7 +3,7 @@ import WatchConnectivity
 import JarvisCore
 
 final class WatchCommandReceiver: NSObject, WCSessionDelegate {
-    private let queue = CommandQueueStore()
+    private let processor = JarvisCommandProcessor()
 
     override init() {
         super.init()
@@ -22,14 +22,14 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any],
                  replyHandler: @escaping ([String: Any]) -> Void) {
-        persist(message, replyHandler: replyHandler)
+        process(message, replyHandler: replyHandler)
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        persist(userInfo, replyHandler: nil)
+        process(userInfo, replyHandler: nil)
     }
 
-    private func persist(_ payload: [String: Any], replyHandler: (([String: Any]) -> Void)?) {
+    private func process(_ payload: [String: Any], replyHandler: (([String: Any]) -> Void)?) {
         guard let rawKind = payload["kind"] as? String,
               let kind = JarvisCommandKind(rawValue: rawKind),
               let text = payload["text"] as? String,
@@ -37,12 +37,20 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
             replyHandler?(["accepted": false, "reason": "Invalid command payload"])
             return
         }
+
         Task {
             do {
-                let command = try await queue.enqueue(kind: kind, text: text)
-                replyHandler?(["accepted": true, "id": command.id.uuidString])
+                let result = try await processor.process(kind: kind, text: text)
+                switch result {
+                case let .saved(list, entryID):
+                    replyHandler?(["accepted": true, "state": "saved",
+                                   "list": list.rawValue, "entryID": entryID.uuidString])
+                case let .requiresAI(commandID, _):
+                    replyHandler?(["accepted": true, "state": "waiting_for_ai",
+                                   "commandID": commandID.uuidString])
+                }
             } catch {
-                replyHandler?(["accepted": false, "reason": "Could not save command"])
+                replyHandler?(["accepted": false, "reason": "Could not process command"])
             }
         }
     }
