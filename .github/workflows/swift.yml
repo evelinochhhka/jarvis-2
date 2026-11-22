@@ -1,0 +1,19 @@
+name: Swift native core
+on:
+  push:
+    branches: [foundation/architecture]
+    paths:
+      - "native/JarvisCore/**"
+      - ".github/workflows/swift.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "native/JarvisCore/**"
+      - ".github/workflows/swift.yml"
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run JarvisCore tests
+        run: swift test --package-path native/JarvisCore
