@@ -63,6 +63,15 @@ final class WatchCommandBridge: NSObject, ObservableObject, WCSessionDelegate {
         DispatchQueue.main.async { self.status = session.isReachable ? "iPhone на связи" : "iPhone временно недоступен" }
     }
 
+
+    func session(_ session: WCSession, didFinishUserInfoTransfer userInfoTransfer: WCSessionUserInfoTransfer,
+                 error: Error?) {
+        DispatchQueue.main.async {
+            self.status = error?.localizedDescription
+                ?? "Команда доставлена на iPhone. Если она ожидает ИИ, ответ появится после подключения модели."
+        }
+    }
+
     func session(_ session: WCSession, didReceiveMessage message: [String : Any],
                  replyHandler: @escaping ([String : Any]) -> Void) {
         replyHandler(["accepted": false, "reason": "iPhone command receiver is not connected yet"])
