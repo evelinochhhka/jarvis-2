@@ -53,14 +53,13 @@ public actor JarvisConversationStore {
         let safeLimit = min(200, max(1, limit))
         return Array(messages
             .filter { $0.conversationID == conversationID }
-            .sorted { $0.createdAt < $1.createdAt }
             .suffix(safeLimit))
     }
 
     public func conversationIDs() throws -> [UUID] {
         try loadIfNeeded()
         var seen = Set<UUID>()
-        return messages.sorted { $0.createdAt > $1.createdAt }.compactMap {
+        return messages.reversed().compactMap {
             seen.insert($0.conversationID).inserted ? $0.conversationID : nil
         }
     }
