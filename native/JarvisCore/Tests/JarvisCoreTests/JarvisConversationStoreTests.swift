@@ -16,7 +16,8 @@ final class JarvisConversationStoreTests: XCTestCase {
         XCTAssertEqual(history.count, 2)
 
         try await second.deleteConversation(id: conversationID)
-        XCTAssertTrue(try await second.history(conversationID: conversationID).isEmpty)
+        let deletedHistory = try await second.history(conversationID: conversationID)
+        XCTAssertTrue(deletedHistory.isEmpty)
     }
 
     func testEmptyMessagesAreRejected() async {
