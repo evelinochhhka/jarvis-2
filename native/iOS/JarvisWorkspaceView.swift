@@ -66,7 +66,7 @@ struct JarvisWorkspaceView: View {
                                 setCompleted(entry, to: !entry.isCompleted)
                             } label: {
                                 Image(systemName: entry.isCompleted ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(entry.isCompleted ? .green : .secondary)
+                                    .foregroundColor(entry.isCompleted ? .green : .secondary)
                             }
                             .buttonStyle(.plain)
                             VStack(alignment: .leading, spacing: 4) {
