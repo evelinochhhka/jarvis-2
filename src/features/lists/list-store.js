@@ -158,17 +158,55 @@ export function exportAllLists() {
 }
 
 export function importAllLists(payload) {
-  if (!payload || payload.version !== 1 || !payload.lists) {
+  if (!payload || payload.version !== 1 || !payload.lists || typeof payload.lists !== "object") {
     throw new TypeError("Файл резервной копии имеет неподдерживаемый формат.");
   }
 
   const next = { version: 1, lists: {} };
   for (const type of LIST_TYPES) {
-    if (!Array.isArray(payload.lists[type])) {
+    const source = payload.lists[type];
+    if (!Array.isArray(source)) {
       throw new TypeError(`В резервной копии отсутствует список «${type}».`);
     }
-    next.lists[type] = payload.lists[type];
+
+    next.lists[type] = source.map((raw) => {
+      if (!raw || typeof raw !== "object" || typeof raw.id !== "string" || !raw.id.trim()) {
+        throw new TypeError("В резервной копии найден элемент без корректного идентификатора.");
+      }
+      if (typeof raw.createdAt !== "string" || Number.isNaN(Date.parse(raw.createdAt))) {
+        throw new TypeError("В резервной копии найдена некорректная дата создания.");
+      }
+
+      const item = {
+        id: raw.id.slice(0, 120),
+        title: cleanText(raw.title, "название"),
+        note: typeof raw.note === "string" ? raw.note.trim().slice(0, 2000) : "",
+        completed: Boolean(raw.completed),
+        createdAt: new Date(raw.createdAt).toISOString(),
+        updatedAt: typeof raw.updatedAt === "string" && !Number.isNaN(Date.parse(raw.updatedAt))
+          ? new Date(raw.updatedAt).toISOString()
+          : new Date(raw.createdAt).toISOString()
+      };
+
+      if (type === "reminders") {
+        if (typeof raw.dueAt !== "string" || Number.isNaN(Date.parse(raw.dueAt))) {
+          throw new TypeError("В резервной копии найдено напоминание с некорректной датой.");
+        }
+        const frequency = ["none", "daily", "weekly", "monthly"].includes(raw.repeat?.frequency)
+          ? raw.repeat.frequency
+          : "none";
+        item.dueAt = new Date(raw.dueAt).toISOString();
+        item.timeZone = typeof raw.timeZone === "string" ? raw.timeZone.slice(0, 100) : "UTC";
+        item.repeat = {
+          frequency,
+          interval: Math.max(1, Math.min(30, Number(raw.repeat?.interval) || 1))
+        };
+        item.enabled = raw.enabled !== false;
+      }
+      return item;
+    });
   }
+
   saveData(next);
   return exportAllLists();
 }
