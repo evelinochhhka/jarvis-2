@@ -34,8 +34,9 @@ public actor JarvisConversationService {
             return .engineUnavailable
         }
 
-        let history = try await store.history(conversationID: conversationID)
-        let response = try await engine.generateReply(prompt: prompt, history: history)
+        let storedHistory = try await store.history(conversationID: conversationID)
+        let previousMessages = Array(storedHistory.dropLast())
+        let response = try await engine.generateReply(prompt: prompt, history: previousMessages)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !response.isEmpty else { throw ConversationServiceError.emptyResponse }
         _ = try await store.append(conversationID: conversationID, role: .assistant, text: response)
