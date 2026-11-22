@@ -5,8 +5,11 @@ struct JarvisWorkspaceView: View {
     @State private var selectedList: JarvisWorkspaceList = .tasks
     @State private var entries: [JarvisWorkspaceEntry] = []
     @State private var draft = ""
+    @State private var reminderDate = Date().addingTimeInterval(3600)
+    @State private var reminderRepeat: JarvisReminderRepeat = .none
     @State private var errorMessage: String?
     private let store = JarvisWorkspaceStore()
+    private let reminderScheduler = JarvisReminderScheduler()
 
     var body: some View {
         VStack(spacing: 12) {
@@ -28,6 +31,16 @@ struct JarvisWorkspaceView: View {
                 }
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel("Добавить запись")
+            }
+
+            if selectedList == .reminders {
+                DatePicker("Дата и время", selection: $reminderDate, in: Date()...)
+                Picker("Повтор", selection: $reminderRepeat) {
+                    ForEach(JarvisReminderRepeat.allCases, id: \.self) { frequency in
+                        Text(frequency.title).tag(frequency)
+                    }
+                }
+                .pickerStyle(.menu)
             }
 
             if let errorMessage {
@@ -60,9 +73,18 @@ struct JarvisWorkspaceView: View {
                                 Text(entry.title)
                                     .strikethrough(entry.isCompleted)
                                     .foregroundStyle(entry.isCompleted ? .secondary : .primary)
-                                Text(entry.createdAt, style: .date)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                if let reminder = entry.reminder {
+                                    Text(reminder.date, style: .date)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(reminder.repeatFrequency.title)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Text(entry.createdAt, style: .date)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             Spacer(minLength: 4)
                             Button(role: .destructive) {
@@ -98,8 +120,19 @@ struct JarvisWorkspaceView: View {
         let title = draft
         Task {
             do {
-                _ = try await store.add(to: selectedList, title: title)
+                let schedule = selectedList == .reminders
+                    ? JarvisReminderSchedule(date: reminderDate, repeatFrequency: reminderRepeat)
+                    : nil
+                let entry = try await store.add(to: selectedList, title: title, reminder: schedule)
                 draft = ""
+                if selectedList == .reminders {
+                    do {
+                        try await reminderScheduler.schedule(entry)
+                        errorMessage = nil
+                    } catch {
+                        errorMessage = "Напоминание сохранено, но системное уведомление не включено. Проверьте разрешения и дату."
+                    }
+                }
                 await reload()
             } catch {
                 errorMessage = "Не удалось сохранить запись."
@@ -111,6 +144,7 @@ struct JarvisWorkspaceView: View {
         Task {
             do {
                 try await store.setCompleted(id: entry.id, isCompleted: value)
+                if value { reminderScheduler.cancel(entryID: entry.id) }
                 await reload()
             } catch {
                 errorMessage = "Не удалось обновить запись."
@@ -122,6 +156,7 @@ struct JarvisWorkspaceView: View {
         Task {
             do {
                 try await store.delete(id: entry.id)
+                reminderScheduler.cancel(entryID: entry.id)
                 await reload()
             } catch {
                 errorMessage = "Не удалось удалить запись."
