@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "start:server": "node server/src/index.js",
     "test": "node --test",
-    "check": "node --check src/app/main.js && node --check src/features/lists/list-store.js && node --check src/services/storage/local-store.js && node --check src/services/api/client.js && node --check src/features/communications/push-client.js && node --check src/features/communications/communications.js && node --check src/features/focus/focus-shortcuts.js"
+    "check": "node --check src/app/main.js && node --check src/features/lists/list-store.js && node --check src/services/storage/local-store.js && node --check src/services/api/client.js && node --check src/features/communications/push-client.js && node --check src/features/communications/communications.js && node --check src/features/focus/focus-shortcuts.js && node --check server/src/config.js && node --check server/src/providers/openai-compatible.js && node --check server/src/app.js && node --check server/src/index.js"
   },
   "engines": {
     "node": ">=20"
