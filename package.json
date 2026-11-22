@@ -1,0 +1,13 @@
+{
+  "name": "jarvis-2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/app/main.js && node --check src/features/lists/list-store.js && node --check src/services/storage/local-store.js && node --check src/services/api/client.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
