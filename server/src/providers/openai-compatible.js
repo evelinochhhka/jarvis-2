@@ -9,7 +9,7 @@ export class ProviderError extends Error {
 
 export function createOpenAICompatibleProvider(config, fetchImpl = fetch) {
   return {
-    async generateReply({ message, language = "auto", preferredLanguage = "ru" }) {
+    async generateReply({ message, language = "auto", preferredLanguage = "ru", history = [] }) {
       if (!config.apiKey) {
         throw new ProviderError("ИИ-провайдер не настроен.", "AI_NOT_CONFIGURED", 503);
       }
@@ -45,6 +45,10 @@ export function createOpenAICompatibleProvider(config, fetchImpl = fetch) {
             model: config.model,
             messages: [
               { role: "system", content: systemPrompt },
+              ...history.slice(-20).map((item) => ({
+                role: item.role,
+                content: item.content.trim()
+              })),
               { role: "user", content: message }
             ],
             max_completion_tokens: 1200
