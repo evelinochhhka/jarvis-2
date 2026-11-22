@@ -47,7 +47,7 @@ export function checkServer() {
   return request("/health", { method: "GET" });
 }
 
-export function sendChatMessage({ message, conversationId = null, clientRequestId }) {
+export function sendChatMessage({ message, conversationId = null, clientRequestId, history = [] }) {
   if (typeof message !== "string" || !message.trim()) {
     throw new TypeError("Введите сообщение.");
   }
@@ -57,7 +57,8 @@ export function sendChatMessage({ message, conversationId = null, clientRequestI
     body: JSON.stringify({
       message: message.trim(),
       conversationId,
-      clientRequestId
+      clientRequestId,
+      history: Array.isArray(history) ? history.slice(-20) : []
     })
   });
 }
