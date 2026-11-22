@@ -22,6 +22,8 @@ targets:
     dependencies:
       - package: JarvisCore
         product: JarvisCore
+      - target: JARVIS2Watch
+        embed: true
     info:
       path: iOS/Generated-Info.plist
       properties:
@@ -59,6 +61,7 @@ targets:
         SWIFT_VERSION: "5.9"
         GENERATE_INFOPLIST_FILE: "YES"
         CODE_SIGNING_ALLOWED: "NO"
+        SKIP_INSTALL: "YES"
 
 schemes:
   JARVIS2:
