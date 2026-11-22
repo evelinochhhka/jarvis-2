@@ -37,8 +37,13 @@ struct JarvisWorkspaceView: View {
             }
 
             if entries.isEmpty {
-                ContentUnavailableView("Пока пусто", systemImage: "tray",
-                                       description: Text("Добавьте первую запись в раздел «\(selectedList.title)»."))
+                VStack(spacing: 8) {
+                    Image(systemName: "tray").font(.largeTitle).foregroundStyle(.secondary)
+                    Text("Пока пусто").font(.headline)
+                    Text("Добавьте первую запись в раздел «\\(selectedList.title)».")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 Spacer()
             } else {
                 List {
