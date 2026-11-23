@@ -13,6 +13,9 @@ export function loadConfig(env = process.env) {
   const apiKey = (env.AI_API_KEY || "").trim();
   const appOrigin = (env.APP_ORIGIN || "").trim();
   const apiAccessToken = (env.API_ACCESS_TOKEN || "").trim();
+  if (apiAccessToken && Buffer.byteLength(apiAccessToken, "utf8") < 32) {
+    throw new Error("API_ACCESS_TOKEN должен содержать не менее 32 байт.");
+  }
 
   return {
     host: (env.HOST || "127.0.0.1").trim(),
