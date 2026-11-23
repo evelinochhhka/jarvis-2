@@ -28,6 +28,7 @@ private actor WatchPayloadLedger {
 final class WatchCommandReceiver: NSObject, WCSessionDelegate {
     private let processor = JarvisCommandProcessor()
     private let payloadLedger = WatchPayloadLedger()
+    private let reminderScheduler = JarvisReminderScheduler()
 
     override init() {
         super.init()
@@ -72,18 +73,37 @@ final class WatchCommandReceiver: NSObject, WCSessionDelegate {
 
             do {
                 let result = try await processor.process(kind: kind, text: text)
-                await payloadLedger.markProcessed(payloadID)
+                var response: [String: Any]
                 switch result {
                 case let .saved(list, entryID):
-                    replyHandler?(["accepted": true, "state": "saved",
-                                   "list": list.rawValue, "entryID": entryID.uuidString])
+                    if list == .reminders {
+                        do {
+                            let entries = try await processor.entries(in: .reminders)
+                            if let entry = entries.first(where: { $0.id == entryID }) {
+                                try await reminderScheduler.schedule(entry)
+                                response = ["accepted": true, "state": "saved",
+                                            "list": list.rawValue, "entryID": entryID.uuidString]
+                            } else {
+                                response = ["accepted": true, "state": "saved_needs_schedule",
+                                            "entryID": entryID.uuidString]
+                            }
+                        } catch {
+                            response = ["accepted": true, "state": "saved_needs_schedule",
+                                        "entryID": entryID.uuidString]
+                        }
+                    } else {
+                        response = ["accepted": true, "state": "saved",
+                                    "list": list.rawValue, "entryID": entryID.uuidString]
+                    }
                 case let .savedReminderNeedsSchedule(entryID):
-                    replyHandler?(["accepted": true, "state": "saved_needs_schedule",
-                                   "entryID": entryID.uuidString])
+                    response = ["accepted": true, "state": "saved_needs_schedule",
+                                "entryID": entryID.uuidString]
                 case let .requiresAI(commandID, _):
-                    replyHandler?(["accepted": true, "state": "waiting_for_ai",
-                                   "commandID": commandID.uuidString])
+                    response = ["accepted": true, "state": "waiting_for_ai",
+                                "commandID": commandID.uuidString]
                 }
+                await payloadLedger.markProcessed(payloadID)
+                replyHandler?(response)
             } catch {
                 await payloadLedger.release(payloadID)
                 replyHandler?(["accepted": false, "reason": "Could not process command"])
