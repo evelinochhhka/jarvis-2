@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ProviderError } from "./providers/openai-compatible.js";
 
 const API_PREFIX = "/api/v1";
+const MAX_RATE_LIMIT_CLIENTS = 10_000;
 
 function createRateLimiter({ windowMs, maxRequests }) {
   const clients = new Map();
@@ -14,9 +15,14 @@ function createRateLimiter({ windowMs, maxRequests }) {
     }
     entry.count += 1;
 
-    if (clients.size > 10_000) {
+    if (clients.size > MAX_RATE_LIMIT_CLIENTS) {
       for (const [key, value] of clients) {
         if (value.resetAt <= now) clients.delete(key);
+      }
+      while (clients.size > MAX_RATE_LIMIT_CLIENTS) {
+        const oldestKey = clients.keys().next().value;
+        if (oldestKey === undefined) break;
+        clients.delete(oldestKey);
       }
     }
 
@@ -119,7 +125,15 @@ export function createAppServer({ config, provider }) {
   return createServer(async (request, response) => {
     const origin = request.headers.origin || "";
     const allowedOrigin = config.appOrigin && origin === config.appOrigin ? origin : "";
-    const path = new URL(request.url || "/", "http://localhost").pathname;
+    let path;
+    try {
+      path = new URL(request.url || "/", "http://localhost").pathname;
+    } catch {
+      sendJson(response, 400, {
+        error: { code: "INVALID_URL", message: "Некорректный адрес запроса." }
+      });
+      return;
+    }
 
     if (origin && config.appOrigin && origin !== config.appOrigin) {
       sendJson(response, 403, { error: { code: "ORIGIN_NOT_ALLOWED", message: "Источник запроса не разрешён." } });
