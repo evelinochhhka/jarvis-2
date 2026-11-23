@@ -1,9 +1,14 @@
 import { createHash } from "node:crypto";
+import { isIP } from "node:net";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import webPush from "web-push";
 
 const MAX_SUBSCRIPTIONS = 20;
+
+function pushError(message, status = 400, code = "INVALID_PUSH_REQUEST") {
+  return Object.assign(new Error(message), { status, code });
+}
 
 function endpointId(endpoint) {
   return createHash("sha256").update(endpoint).digest("hex");
@@ -11,23 +16,29 @@ function endpointId(endpoint) {
 
 function validateSubscription(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Ожидается объект push-подписки.");
+    throw pushError("Ожидается объект push-подписки.");
   }
   const endpoint = typeof value.endpoint === "string" ? value.endpoint : "";
   let url;
   try {
     url = new URL(endpoint);
   } catch {
-    throw new Error("Некорректный endpoint push-подписки.");
+    throw pushError("Некорректный endpoint push-подписки.");
   }
-  if (url.protocol !== "https:" || endpoint.length > 2048) {
-    throw new Error("Push endpoint должен быть HTTPS-адресом.");
+  const host = url.hostname.toLowerCase();
+  const allowedHost = host === "fcm.googleapis.com"
+    || host.endsWith(".push.apple.com")
+    || host === "updates.push.services.mozilla.com"
+    || host.endsWith(".notify.windows.com");
+  if (url.protocol !== "https:" || endpoint.length > 2048
+      || !allowedHost || isIP(host.replace(/^\\[|\\]$/g, ""))) {
+    throw pushError("Push endpoint не относится к поддерживаемому публичному push-сервису.");
   }
   const p256dh = value.keys?.p256dh;
   const auth = value.keys?.auth;
   if (typeof p256dh !== "string" || typeof auth !== "string"
       || p256dh.length > 256 || auth.length > 128) {
-    throw new Error("В push-подписке отсутствуют корректные ключи шифрования.");
+    throw pushError("В push-подписке отсутствуют корректные ключи шифрования.");
   }
   return { endpoint, expirationTime: value.expirationTime ?? null, keys: { p256dh, auth } };
 }
@@ -91,13 +102,13 @@ export function createPushManager(config, client = webPush) {
       return configured ? config.vapidPublicKey : "";
     },
     async saveSubscription(input) {
-      if (!configured) throw new Error("Web Push не настроен на сервере.");
+      if (!configured) throw pushError("Web Push не настроен на сервере.", 503, "PUSH_NOT_CONFIGURED");
       const subscription = validateSubscription(input);
       await updateSubscriptions(current => {
         const id = endpointId(subscription.endpoint);
         const remaining = current.filter(item => endpointId(item.endpoint) !== id);
         if (remaining.length >= MAX_SUBSCRIPTIONS) {
-          throw new Error("Достигнут лимит устройств для push-уведомлений.");
+          throw pushError("Достигнут лимит устройств для push-уведомлений.", 429, "PUSH_DEVICE_LIMIT");
         }
         return [...remaining, subscription];
       });
@@ -111,7 +122,7 @@ export function createPushManager(config, client = webPush) {
     },
     async removeSubscription(endpoint) {
       if (typeof endpoint !== "string" || !endpoint.startsWith("https://")) {
-        throw new Error("Некорректный endpoint push-подписки.");
+        throw pushError("Некорректный endpoint push-подписки.");
       }
       await removeByEndpoint(endpoint);
       return { removed: true };
