@@ -8,13 +8,23 @@ function readPositiveInteger(value, fallback, maximum) {
 
 export function loadConfig(env = process.env) {
   const provider = (env.AI_PROVIDER || "openrouter").trim().toLowerCase();
-  const baseUrl = (env.AI_BASE_URL || DEFAULT_BASE_URL).trim().replace(/\/+$/, "");
+  const baseUrl = (env.AI_BASE_URL || DEFAULT_BASE_URL).trim().replace(/\\/+$/, "");
   const model = (env.AI_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free").trim();
   const apiKey = (env.AI_API_KEY || "").trim();
   const appOrigin = (env.APP_ORIGIN || "").trim();
   const apiAccessToken = (env.API_ACCESS_TOKEN || "").trim();
+  const pushPublicKey = (env.VAPID_PUBLIC_KEY || "").trim();
+  const pushPrivateKey = (env.VAPID_PRIVATE_KEY || "").trim();
+  const pushSubject = (env.VAPID_SUBJECT || "").trim();
+
   if (apiAccessToken && Buffer.byteLength(apiAccessToken, "utf8") < 32) {
     throw new Error("API_ACCESS_TOKEN должен содержать не менее 32 байт.");
+  }
+  if (Boolean(pushPublicKey) !== Boolean(pushPrivateKey)) {
+    throw new Error("VAPID_PUBLIC_KEY и VAPID_PRIVATE_KEY должны задаваться вместе.");
+  }
+  if (pushPublicKey && !/^(mailto:|https:\\/\\/)/i.test(pushSubject)) {
+    throw new Error("Для Web Push задайте VAPID_SUBJECT в формате mailto: или HTTPS URL.");
   }
 
   return {
@@ -31,6 +41,11 @@ export function loadConfig(env = process.env) {
     requestTimeoutMs: readPositiveInteger(env.AI_TIMEOUT_MS, 25_000, 60_000),
     rateLimitWindowMs: readPositiveInteger(env.RATE_LIMIT_WINDOW_MS, 60_000, 3_600_000),
     rateLimitMaxRequests: readPositiveInteger(env.RATE_LIMIT_MAX_REQUESTS, 20, 500),
+    vapidPublicKey: pushPublicKey,
+    vapidPrivateKey: pushPrivateKey,
+    vapidSubject: pushSubject,
+    pushStorePath: (env.PUSH_STORE_PATH || "server/data/push-subscriptions.json").trim(),
+    isPushConfigured: Boolean(pushPublicKey && pushPrivateKey && pushSubject),
     isAiConfigured: Boolean(apiKey && model && baseUrl)
   };
 }
