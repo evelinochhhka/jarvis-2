@@ -18,7 +18,6 @@ struct WatchHomeView: View {
                 Image(systemName: "waveform").font(.system(size: 30))
                 Text("JARVIS").font(.headline)
                 TextField("Продиктуйте команду", text: $commandText)
-                    .textFieldStyle(.roundedBorder)
                 Button {
                     sendRecognizedCommand()
                 } label: {
