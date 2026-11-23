@@ -8,7 +8,8 @@ function readPositiveInteger(value, fallback, maximum) {
 
 export function loadConfig(env = process.env) {
   const provider = (env.AI_PROVIDER || "openrouter").trim().toLowerCase();
-  const baseUrl = (env.AI_BASE_URL || DEFAULT_BASE_URL).trim().replace(/\\/+$/, "");
+  let baseUrl = (env.AI_BASE_URL || DEFAULT_BASE_URL).trim();
+  while (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
   const model = (env.AI_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free").trim();
   const apiKey = (env.AI_API_KEY || "").trim();
   const appOrigin = (env.APP_ORIGIN || "").trim();
@@ -23,8 +24,16 @@ export function loadConfig(env = process.env) {
   if (Boolean(pushPublicKey) !== Boolean(pushPrivateKey)) {
     throw new Error("VAPID_PUBLIC_KEY и VAPID_PRIVATE_KEY должны задаваться вместе.");
   }
-  if (pushPublicKey && !/^(mailto:|https:\\/\\/)/i.test(pushSubject)) {
-    throw new Error("Для Web Push задайте VAPID_SUBJECT в формате mailto: или HTTPS URL.");
+  if (pushPublicKey) {
+    let validSubject = pushSubject.startsWith("mailto:");
+    try {
+      validSubject ||= new URL(pushSubject).protocol === "https:";
+    } catch {
+      validSubject = false;
+    }
+    if (!validSubject) {
+      throw new Error("Для Web Push задайте VAPID_SUBJECT в формате mailto: или HTTPS URL.");
+    }
   }
 
   return {
