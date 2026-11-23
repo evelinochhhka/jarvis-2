@@ -544,3 +544,37 @@ test("push reminder API lists, saves and removes reminders behind bearer auth", 
     assert.equal(stored.length, 0);
   });
 });
+
+
+test("monthly push reminders preserve their original calendar day after short months", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-monthly-"));
+  const pushManager = {
+    configured: true,
+    async count() { return 1; },
+    async sendToAll() { return { sent: 1, failed: 0 }; }
+  };
+  try {
+    const { createReminderScheduler } = await import("../server/src/reminders.js");
+    const scheduler = createReminderScheduler({
+      reminderStorePath: join(directory, "reminders.json")
+    }, pushManager, { startTimer: false });
+    await scheduler.save({
+      id: "monthly-31",
+      title: "Платёж",
+      dueAt: "2026-01-31T10:00:00.000Z",
+      timeZone: "UTC",
+      repeat: { frequency: "monthly", interval: 1 }
+    });
+    await scheduler.tick(new Date("2026-01-31T11:00:00.000Z"));
+    let [reminder] = await scheduler.list();
+    assert.equal(reminder.dueAt, "2026-02-28T10:00:00.000Z");
+    await scheduler.tick(new Date("2026-03-01T00:00:00.000Z"));
+    [reminder] = await scheduler.list();
+    assert.equal(reminder.dueAt, "2026-03-31T10:00:00.000Z");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
