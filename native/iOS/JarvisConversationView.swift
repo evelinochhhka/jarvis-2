@@ -15,11 +15,7 @@ struct JarvisConversationView: View {
     private let conversationStore = JarvisConversationStore()
 
     private var service: JarvisConversationService {
-        let address = UserDefaults.standard.string(forKey: "jarvis2.api.baseURL") ?? ""
-        let engine = URL(string: address).flatMap {
-            JarvisHTTPAIEngine(serverBaseURL: $0, accessToken: JarvisServerTokenStore.read())
-        }
-        return JarvisConversationService(store: conversationStore, engine: engine)
+        JarvisConversationService(store: conversationStore, engine: JarvisMLXAIEngine())
     }
 
     private var conversationID: UUID {
@@ -126,7 +122,7 @@ struct JarvisConversationView: View {
         let activeConversationID = conversationID
         draft = ""
         isSending = true
-        statusMessage = nil
+        statusMessage = "JARVIS готовит ответ на iPad…"
         Task {
             do {
                 let result = try await service.send(text, conversationID: activeConversationID)
@@ -136,10 +132,11 @@ struct JarvisConversationView: View {
                     statusMessage = nil
                     speak(replyText)
                 case .engineUnavailable:
-                    statusMessage = "Сообщение сохранено. ИИ-движок ещё не подключён, поэтому ответа пока нет."
+                    statusMessage = "Локальный ИИ не подключён."
                 }
             } catch {
-                statusMessage = "Не удалось сохранить сообщение."
+                await reload()
+                statusMessage = "Ошибка локального ИИ: \(error.localizedDescription)"
             }
             isSending = false
         }
