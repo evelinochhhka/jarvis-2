@@ -23,6 +23,8 @@ export function loadConfig(env = process.env) {
     appOrigin,
     maxRequestBytes: readPositiveInteger(env.MAX_REQUEST_BYTES, 16_384, 65_536),
     requestTimeoutMs: readPositiveInteger(env.AI_TIMEOUT_MS, 25_000, 60_000),
+    rateLimitWindowMs: readPositiveInteger(env.RATE_LIMIT_WINDOW_MS, 60_000, 3_600_000),
+    rateLimitMaxRequests: readPositiveInteger(env.RATE_LIMIT_MAX_REQUESTS, 20, 500),
     isAiConfigured: Boolean(apiKey && model && baseUrl)
   };
 }
