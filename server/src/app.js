@@ -46,10 +46,7 @@ function sendJson(response, status, payload, origin) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    ...(origin ? {
-      "Access-Control-Allow-Origin": origin,
-      "Vary": "Origin"
-    } : {})
+    ...(origin ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {})
   });
   response.end(JSON.stringify(payload));
 }
@@ -60,7 +57,7 @@ function readJson(request, maxBytes) {
     let size = 0;
     let tooLarge = false;
     request.setEncoding("utf8");
-    request.on("data", (chunk) => {
+    request.on("data", chunk => {
       if (tooLarge) return;
       size += Buffer.byteLength(chunk, "utf8");
       if (size > maxBytes) {
@@ -73,8 +70,7 @@ function readJson(request, maxBytes) {
     request.on("end", () => {
       if (tooLarge) {
         reject(Object.assign(new Error("Размер запроса превышает допустимый предел."), {
-          status: 413,
-          code: "REQUEST_TOO_LARGE"
+          status: 413, code: "REQUEST_TOO_LARGE"
         }));
         return;
       }
@@ -82,8 +78,7 @@ function readJson(request, maxBytes) {
         resolve(JSON.parse(body || "{}"));
       } catch {
         reject(Object.assign(new Error("Некорректный JSON."), {
-          status: 400,
-          code: "INVALID_JSON"
+          status: 400, code: "INVALID_JSON"
         }));
       }
     });
@@ -125,7 +120,13 @@ function validateChatPayload(payload) {
   return null;
 }
 
-export function createAppServer({ config, provider }) {
+function sendApiError(response, error, origin, fallbackCode = "SERVER_ERROR") {
+  const status = error.status || 400;
+  const code = error.code || fallbackCode;
+  sendJson(response, status, { error: { code, message: error.message || "Не удалось обработать запрос." } }, origin);
+}
+
+export function createAppServer({ config, provider, pushManager = null }) {
   const checkRateLimit = createRateLimiter({
     windowMs: config.rateLimitWindowMs || 60_000,
     maxRequests: config.rateLimitMaxRequests || 20
@@ -138,9 +139,7 @@ export function createAppServer({ config, provider }) {
     try {
       path = new URL(request.url || "/", "http://localhost").pathname;
     } catch {
-      sendJson(response, 400, {
-        error: { code: "INVALID_URL", message: "Некорректный адрес запроса." }
-      });
+      sendJson(response, 400, { error: { code: "INVALID_URL", message: "Некорректный адрес запроса." } });
       return;
     }
 
@@ -151,7 +150,7 @@ export function createAppServer({ config, provider }) {
 
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization",
         "Access-Control-Max-Age": "600",
         ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin, Vary: "Origin" } : {})
@@ -164,8 +163,55 @@ export function createAppServer({ config, provider }) {
       sendJson(response, 200, {
         status: "ok",
         apiVersion: "v1",
-        aiConfigured: config.isAiConfigured
+        aiConfigured: config.isAiConfigured,
+        pushConfigured: Boolean(pushManager?.configured)
       }, allowedOrigin);
+      return;
+    }
+
+    if (request.method === "GET" && path === `${API_PREFIX}/push/public-key`) {
+      if (!pushManager?.configured) {
+        sendJson(response, 503, {
+          error: { code: "PUSH_NOT_CONFIGURED", message: "Web Push ещё не настроен на сервере." }
+        }, allowedOrigin);
+        return;
+      }
+      sendJson(response, 200, { publicKey: pushManager.publicKey }, allowedOrigin);
+      return;
+    }
+
+    if ((request.method === "POST" || request.method === "DELETE")
+        && path === `${API_PREFIX}/push/subscriptions`) {
+      if (!pushManager?.configured) {
+        sendJson(response, 503, {
+          error: { code: "PUSH_NOT_CONFIGURED", message: "Web Push ещё не настроен на сервере." }
+        }, allowedOrigin);
+        return;
+      }
+      if (!config.isApiAuthEnabled) {
+        sendJson(response, 503, {
+          error: { code: "PUSH_AUTH_REQUIRED", message: "Для регистрации устройств сначала настройте API_ACCESS_TOKEN." }
+        }, allowedOrigin);
+        return;
+      }
+      if (!hasValidBearerToken(request, config.apiAccessToken)) {
+        sendJson(response, 401, {
+          error: { code: "UNAUTHORIZED", message: "Для управления push-подписками нужен действительный токен." }
+        }, allowedOrigin);
+        return;
+      }
+      try {
+        const payload = await readJson(request, 16_384);
+        if (request.method === "POST") {
+          const result = await pushManager.saveSubscription(payload);
+          sendJson(response, 201, result, allowedOrigin);
+        } else {
+          const result = await pushManager.removeSubscription(payload.endpoint);
+          sendJson(response, 200, result, allowedOrigin);
+        }
+      } catch (error) {
+        sendApiError(response, error, allowedOrigin, "PUSH_REQUEST_FAILED");
+      }
       return;
     }
 
@@ -185,7 +231,6 @@ export function createAppServer({ config, provider }) {
         }, allowedOrigin);
         return;
       }
-
       if (!config.isAiConfigured) {
         sendJson(response, 503, {
           error: { code: "AI_NOT_CONFIGURED", message: "ИИ пока не настроен на сервере." }
@@ -202,14 +247,12 @@ export function createAppServer({ config, provider }) {
           }, allowedOrigin);
           return;
         }
-
         const content = await provider.generateReply({
           message: payload.message.trim(),
           language: payload.language || "auto",
           preferredLanguage: payload.preferredLanguage || "ru",
           history: payload.history || []
         });
-
         sendJson(response, 200, {
           conversationId: typeof payload.conversationId === "string" ? payload.conversationId : randomUUID(),
           language: payload.language === "uk" ? "uk" : payload.language === "ru" ? "ru" : payload.preferredLanguage || "ru",
