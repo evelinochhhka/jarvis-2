@@ -4,7 +4,12 @@ import {
   getItems,
   updateItem
 } from "../features/lists/list-store.js";
-import { sendChatMessage } from "../services/api/client.js";
+import {
+  deletePushReminder,
+  listPushReminders,
+  savePushReminder,
+  sendChatMessage
+} from "../services/api/client.js";
 import { renderCommunications } from "../features/communications/communications.js";
 
 const dashboard = document.querySelector(".dashboard");
@@ -27,7 +32,7 @@ const listConfig = {
   tasks: { title: "Хочу сделать", description: "Задачи и планы, которые вы хотите выполнить." },
   watchlist: { title: "Хочу посмотреть", description: "Фильмы, сериалы и видео, к которым вы хотите вернуться." },
   wishlist: { title: "Мои хотелки", description: "Покупки, идеи и желания, которые стоит сохранить." },
-  reminders: { title: "Напоминания", description: "Локальное расписание. Пока без системных push-уведомлений." }
+  reminders: { title: "Напоминания", description: "Локальное расписание с серверной доставкой push после настройки и подписки устройства." }
 };
 
 function addStyles() {
@@ -151,6 +156,8 @@ function renderList(type) {
 
   const list = element("div", "module-items");
   shell.append(list);
+  const pushNotice = type === "reminders" ? element("p", "module-notice", "Проверка синхронизации push-напоминаний...") : null;
+  if (pushNotice) shell.append(pushNotice);
 
   function refresh() {
     const items = getItems(type);
@@ -169,8 +176,16 @@ function renderList(type) {
       checkbox.checked = type === "reminders" ? !item.enabled : item.completed;
       checkbox.setAttribute("aria-label", type === "reminders" ? "Отключить напоминание" : "Отметить выполненным");
       checkbox.addEventListener("change", () => {
-        if (type === "reminders") updateItem(type, item.id, { enabled: !checkbox.checked });
-        else updateItem(type, item.id, { completed: checkbox.checked });
+        if (type === "reminders") {
+          const updated = updateItem(type, item.id, { enabled: !checkbox.checked });
+          if (updated?.enabled) {
+            savePushReminder(updated).then(() => { pushNotice.textContent = "Напоминание синхронизировано с сервером."; })
+              .catch(error => { pushNotice.textContent = `Сохранено локально. Push не синхронизирован: ${error.message}`; });
+          } else {
+            deletePushReminder(item.id).catch(() => {});
+            if (pushNotice) pushNotice.textContent = "Напоминание выключено локально и на сервере.";
+          }
+        } else updateItem(type, item.id, { completed: checkbox.checked });
         refresh();
       });
 
@@ -223,7 +238,11 @@ function renderList(type) {
           changes.repeat = { frequency: nextRepeat, interval: item.repeat?.interval || 1 };
         }
         try {
-          updateItem(type, item.id, changes);
+          const updated = updateItem(type, item.id, changes);
+          if (type === "reminders" && updated?.enabled) {
+            savePushReminder(updated).then(() => { pushNotice.textContent = "Изменения напоминания синхронизированы."; })
+              .catch(error => { pushNotice.textContent = `Изменено локально. Push не синхронизирован: ${error.message}`; });
+          }
           refresh();
         } catch (error) {
           window.alert(error.message || "Не удалось изменить элемент.");
@@ -232,7 +251,10 @@ function renderList(type) {
       const remove = element("button", "module-button danger", "Удалить");
       remove.type = "button";
       remove.addEventListener("click", () => {
-        if (deleteItem(type, item.id)) refresh();
+        if (deleteItem(type, item.id)) {
+          if (type === "reminders") deletePushReminder(item.id).catch(() => {});
+          refresh();
+        }
       });
       actions.append(edit, remove);
       row.append(checkbox, main, actions);
@@ -251,7 +273,14 @@ function renderList(type) {
         input.dueAt = new Date(dueInput.value).toISOString();
         input.repeat = { frequency: repeatSelect.value, interval: 1 };
       }
-      addItem(type, input);
+      const created = addItem(type, input);
+      if (type === "reminders") {
+        savePushReminder(created).then(() => {
+          pushNotice.textContent = "Напоминание сохранено на сервере. Push-доставка включена для подписанных устройств.";
+        }).catch(error => {
+          pushNotice.textContent = `Напоминание сохранено локально. Серверная доставка пока недоступна: ${error.message}`;
+        });
+      }
       form.reset();
       refresh();
       title.focus();
@@ -262,10 +291,20 @@ function renderList(type) {
 
   shell.append(element("p", "module-notice",
     type === "reminders"
-      ? "Напоминания сохраняются локально. Пока приложение не отправляет системные уведомления и не запускает повторения автоматически."
+      ? "Если сервер или токен не настроен, напоминание останется только в локальном списке. Для фоновой доставки нужны Web Push, подписка устройства и настроенный сервер."
       : "Данные сохраняются в браузере на этом устройстве и пока не синхронизируются с другими устройствами."
   ));
   refresh();
+  if (type === "reminders") {
+    listPushReminders().then(async result => {
+      const remoteIds = new Set((result.reminders || []).map(item => item.id));
+      const local = getItems("reminders").filter(item => item.enabled && !remoteIds.has(item.id));
+      for (const item of local) await savePushReminder(item);
+      pushNotice.textContent = "Серверные напоминания синхронизированы.";
+    }).catch(error => {
+      pushNotice.textContent = `Локальный список работает. Серверная синхронизация недоступна: ${error.message}`;
+    });
+  }
   return shell;
 }
 
