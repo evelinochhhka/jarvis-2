@@ -328,7 +328,7 @@ test("push subscription manager persists subscriptions and sends a confirmation"
       pushStorePath: join(directory, "subscriptions.json")
     }, client);
     const subscription = {
-      endpoint: "https://push.example.test/subscription/one",
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-subscription-one",
       expirationTime: null,
       keys: { p256dh: "p256dh-test", auth: "auth-test" }
     };
@@ -361,7 +361,7 @@ test("push subscription routes require bearer authentication and expose only the
       return { saved: true, notificationSent: true };
     },
     async removeSubscription(endpoint) {
-      return { removed: endpoint === "https://push.example.test/subscription/one" };
+      return { removed: endpoint === "https://fcm.googleapis.com/fcm/send/test-subscription-one" };
     }
   };
   await withServer({ config, provider: {}, pushManager }, async baseUrl => {
@@ -370,7 +370,7 @@ test("push subscription routes require bearer authentication and expose only the
     assert.equal((await keyResponse.json()).publicKey, "public-vapid-key");
 
     const body = {
-      endpoint: "https://push.example.test/subscription/one",
+      endpoint: "https://fcm.googleapis.com/fcm/send/test-subscription-one",
       keys: { p256dh: "public-key", auth: "auth-key" }
     };
     const denied = await fetch(`${baseUrl}/api/v1/push/subscriptions`, {
