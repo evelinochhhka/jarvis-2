@@ -41,10 +41,14 @@ public final class JarvisHTTPAIEngine: JarvisAIEngine, @unchecked Sendable {
     private let session: URLSession
 
     public init?(serverBaseURL: URL, session: URLSession = .shared) {
-        guard var components = URLComponents(url: serverBaseURL, resolvingAgainstBaseURL: false),
-              components.scheme?.lowercased() == "https" || components.host == "localhost" || components.host == "127.0.0.1" else {
+        guard var components = URLComponents(url: serverBaseURL, resolvingAgainstBaseURL: false) else {
             return nil
         }
+        let scheme = components.scheme?.lowercased() ?? ""
+        let host = components.host?.lowercased() ?? ""
+        let isSecure = scheme == "https"
+        let isLocalDevelopment = scheme == "http" && (host == "localhost" || host == "127.0.0.1")
+        guard isSecure || isLocalDevelopment else { return nil }
         let prefix = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
         components.path = prefix + "/api/v1/chat"
         components.query = nil
