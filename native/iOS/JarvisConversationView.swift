@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import JarvisCore
 
@@ -8,6 +9,8 @@ struct JarvisConversationView: View {
     @State private var statusMessage: String?
     @State private var isSending = false
     @State private var showDeleteConfirmation = false
+    @State private var synthesizer = AVSpeechSynthesizer()
+    @AppStorage("jarvis2.voice.identifier") private var selectedVoiceIdentifier = ""
     private let service = JarvisConversationService()
 
     private var conversationID: UUID {
@@ -81,6 +84,9 @@ struct JarvisConversationView: View {
                 .accessibilityLabel("Удалить текущую беседу")
             }
         }
+        .onDisappear {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
         .confirmationDialog("Удалить текущую беседу?", isPresented: $showDeleteConfirmation,
                             titleVisibility: .visible) {
             Button("Удалить беседу", role: .destructive) { deleteCurrentConversation() }
@@ -108,8 +114,9 @@ struct JarvisConversationView: View {
                 let result = try await service.send(text, conversationID: activeConversationID)
                 await reload()
                 switch result {
-                case .reply:
+                case .reply(let replyText):
                     statusMessage = nil
+                    speak(replyText)
                 case .engineUnavailable:
                     statusMessage = "Сообщение сохранено. ИИ-движок ещё не подключён, поэтому ответа пока нет."
                 }
@@ -118,6 +125,18 @@ struct JarvisConversationView: View {
             }
             isSending = false
         }
+    }
+
+    private func speak(_ text: String) {
+        guard !selectedVoiceIdentifier.isEmpty,
+              let voice = AVSpeechSynthesisVoice(identifier: selectedVoiceIdentifier) else {
+            return
+        }
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = voice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        synthesizer.speak(utterance)
     }
 
     private func deleteCurrentConversation() {
