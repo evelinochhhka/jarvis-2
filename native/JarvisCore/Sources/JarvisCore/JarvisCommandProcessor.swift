@@ -8,15 +8,18 @@ public enum JarvisProcessingResult: Sendable, Equatable {
 
 public actor JarvisCommandProcessor {
     private let parser: JarvisCommandParser
+    private let reminderParser: JarvisReminderIntentParser
     private let queue: CommandQueueStore
     private let workspace: JarvisWorkspaceStore
 
     public init(queue: CommandQueueStore = CommandQueueStore(),
                 workspace: JarvisWorkspaceStore = JarvisWorkspaceStore(),
-                parser: JarvisCommandParser = JarvisCommandParser()) {
+                parser: JarvisCommandParser = JarvisCommandParser(),
+                reminderParser: JarvisReminderIntentParser = JarvisReminderIntentParser()) {
         self.queue = queue
         self.workspace = workspace
         self.parser = parser
+        self.reminderParser = reminderParser
     }
 
     public func process(_ transcript: String) async throws -> JarvisProcessingResult {
@@ -28,15 +31,21 @@ public actor JarvisCommandProcessor {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { throw ProcessingError.emptyInput }
 
+        let reminderIntent = kind == .reminder ? reminderParser.parse(cleaned) : nil
+        let entryTitle = reminderIntent?.title ?? cleaned
         let command = try await queue.enqueue(kind: kind, text: cleaned)
         guard let list = Self.destination(for: kind) else {
             return .requiresAI(commandID: command.id, prompt: command.text)
         }
 
         do {
-            let entry = try await workspace.add(to: list, title: command.text)
+            let entry = try await workspace.add(
+                to: list,
+                title: entryTitle,
+                reminder: kind == .reminder ? reminderIntent?.schedule : nil
+            )
             try await queue.updateStatus(id: command.id, status: .completed)
-            if kind == .reminder {
+            if kind == .reminder && entry.reminder == nil {
                 return .savedReminderNeedsSchedule(entryID: entry.id)
             }
             return .saved(list: list, entryID: entry.id)
