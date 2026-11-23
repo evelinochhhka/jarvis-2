@@ -17,7 +17,7 @@ export function renderCommunications() {
   shell.append(element("div", "eyebrow", "PERSONAL ASSISTANT SYSTEM"));
   shell.append(element("h1", "module-heading", "Связь и уведомления"));
   shell.append(element("p", "module-description",
-    "Единый центр системных уведомлений и будущих официальных подключений. Доступность функций зависит от iOS и разрешений платформ."
+    "Единый центр собственных уведомлений JARVIS и будущих официальных подключений. Доступность функций зависит от iOS и разрешений платформ."
   ));
 
   const pushPanel = element("section", "panel");
@@ -40,7 +40,7 @@ export function renderCommunications() {
       labels.push("На iPhone/iPad сначала добавьте веб-приложение на экран «Домой» и запускайте его оттуда.");
     }
     labels.push(`Разрешение браузера: ${capability.permission}.`);
-    labels.push("Сервер push-уведомлений ещё не подключён, поэтому доставка пока не активна.");
+    labels.push("Серверная доставка включится только после настройки VAPID и авторизации сервера.");
     status.textContent = labels.join(" ");
     enable.disabled = !capability.supported;
     disable.disabled = !capability.supported;
@@ -50,8 +50,10 @@ export function renderCommunications() {
     enable.disabled = true;
     notice.textContent = "Проверка разрешений и сервера...";
     try {
-      await enablePushNotifications();
-      notice.textContent = "Подписка на push-уведомления сохранена сервером.";
+      const result = await enablePushNotifications();
+      notice.textContent = result.notificationSent
+        ? "Подписка сохранена. Контрольное push-уведомление отправлено."
+        : "Подписка сохранена, но отправка контрольного уведомления не подтверждена.";
     } catch (error) {
       notice.textContent = error.message || "Не удалось включить уведомления.";
     } finally {
