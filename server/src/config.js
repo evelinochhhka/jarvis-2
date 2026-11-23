@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "https://api.groq.com/openai/v1";
+const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
 
 function readPositiveInteger(value, fallback, maximum) {
   const parsed = Number.parseInt(value || "", 10);
@@ -7,9 +7,9 @@ function readPositiveInteger(value, fallback, maximum) {
 }
 
 export function loadConfig(env = process.env) {
-  const provider = (env.AI_PROVIDER || "groq").trim().toLowerCase();
+  const provider = (env.AI_PROVIDER || "openrouter").trim().toLowerCase();
   const baseUrl = (env.AI_BASE_URL || DEFAULT_BASE_URL).trim().replace(/\/+$/, "");
-  const model = (env.AI_MODEL || "openai/gpt-oss-120b").trim();
+  const model = (env.AI_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free").trim();
   const apiKey = (env.AI_API_KEY || "").trim();
   const appOrigin = (env.APP_ORIGIN || "").trim();
 
