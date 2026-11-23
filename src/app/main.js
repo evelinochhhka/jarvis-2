@@ -439,8 +439,12 @@ function renderSettings() {
 
 function renderPlaceholder(view) {
   if (view === "settings") return renderSettings();
-  const shell = createModuleShell("Файлы", "Модуль файлов ещё не реализован.");
-  shell.append(element("div", "module-empty", "Этот раздел пока находится в разработке."));
+  const shell = createModuleShell("Файлы", "Локальная библиотека документов и вложений.");
+  import("../features/files/files.js")
+    .then(({ renderFiles }) => renderFiles(shell))
+    .catch((error) => {
+      shell.append(element("div", "module-empty", error.message || "Не удалось открыть библиотеку файлов."));
+    });
   return shell;
 }
 
