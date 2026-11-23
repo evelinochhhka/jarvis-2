@@ -65,3 +65,25 @@ export function sendChatMessage({ message, conversationId = null, clientRequestI
     })
   });
 }
+
+export function listPushReminders() {
+  return request("/push/reminders", { method: "GET" });
+}
+
+export function savePushReminder(reminder) {
+  return request("/push/reminders", {
+    method: "POST",
+    body: JSON.stringify({
+      id: reminder.id,
+      title: reminder.title,
+      body: reminder.note || "",
+      dueAt: reminder.dueAt,
+      timeZone: reminder.timeZone || "UTC",
+      repeat: reminder.repeat || { frequency: "none", interval: 1 }
+    })
+  });
+}
+
+export function deletePushReminder(id) {
+  return request(`/push/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
