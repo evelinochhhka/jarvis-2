@@ -17,6 +17,9 @@ async function request(path, options = {}) {
       ...options,
       headers: {
         Accept: "application/json",
+        ...(sessionStorage.getItem("jarvis-2-api-access-token")
+          ? { Authorization: `Bearer ${sessionStorage.getItem("jarvis-2-api-access-token")}` }
+          : {}),
         ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...options.headers
       },
