@@ -34,6 +34,7 @@ function validateReminder(value) {
     body: typeof value.body === "string" ? value.body.trim().slice(0, 500) : "",
     dueAt: dueAt.toISOString(),
     timeZone,
+    anchorDay: zonedParts(dueAt, timeZone).day,
     repeat: { frequency, interval },
     updatedAt: new Date().toISOString()
   };
@@ -85,7 +86,7 @@ function nextOccurrence(reminder) {
   } else if (frequency === "weekly") {
     local.setUTCDate(local.getUTCDate() + 7 * interval);
   } else if (frequency === "monthly") {
-    const day = local.getUTCDate();
+    const day = reminder.anchorDay || local.getUTCDate();
     local.setUTCDate(1);
     local.setUTCMonth(local.getUTCMonth() + interval);
     const lastDay = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + 1, 0)).getUTCDate();
