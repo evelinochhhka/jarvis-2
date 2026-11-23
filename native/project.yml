@@ -24,6 +24,8 @@ targets:
         product: JarvisCore
       - target: JARVIS2Watch
         embed: true
+      - sdk: AppIntents.framework
+        embed: false
     info:
       path: iOS/Generated-Info.plist
       properties:
