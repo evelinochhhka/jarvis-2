@@ -39,7 +39,7 @@ targets:
         CODE_SIGNING_ALLOWED: "NO"
 
   JARVIS2Watch:
-    type: application.watchapp2
+    type: application
     platform: watchOS
     sources:
       - path: watchOS
