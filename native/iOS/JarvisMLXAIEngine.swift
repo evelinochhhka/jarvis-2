@@ -1,4 +1,6 @@
 import Foundation
+import Combine
+import JarvisCore
 import HuggingFace
 import MLXHuggingFace
 import MLXLLM
