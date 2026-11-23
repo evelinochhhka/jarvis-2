@@ -39,7 +39,11 @@ export function createOpenAICompatibleProvider(config, fetchImpl = fetch) {
           headers: {
             Authorization: `Bearer ${config.apiKey}`,
             "Content-Type": "application/json",
-            Accept: "application/json"
+            Accept: "application/json",
+            ...(config.provider === "openrouter" ? {
+              "HTTP-Referer": "https://github.com/evelinochhhka/jarvis-2",
+              "X-Title": "JARVIS 2"
+            } : {})
           },
           body: JSON.stringify({
             model: config.model,
@@ -51,7 +55,9 @@ export function createOpenAICompatibleProvider(config, fetchImpl = fetch) {
               })),
               { role: "user", content: message }
             ],
-            max_completion_tokens: 1200
+            ...(config.provider === "openrouter"
+              ? { max_tokens: 1200, reasoning: { effort: "high" } }
+              : { max_completion_tokens: 1200 })
           }),
           signal: AbortSignal.timeout(config.requestTimeoutMs)
         });
