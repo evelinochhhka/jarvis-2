@@ -30,7 +30,7 @@ function validateSubscription(value) {
     || host === "updates.push.services.mozilla.com"
     || host.endsWith(".notify.windows.com");
   if (url.protocol !== "https:" || endpoint.length > 2048
-      || !allowedHost || isIP(host.replace(/^\\[|\\]$/g, ""))) {
+      || !allowedHost) {
     throw pushError("Push endpoint не относится к поддерживаемому публичному push-сервису.");
   }
   const p256dh = value.keys?.p256dh;
