@@ -279,3 +279,128 @@ test("server configuration rejects weak API access tokens", () => {
     /не менее 32 байт/
   );
 });
+
+
+test("Web Push configuration requires a complete VAPID pair and valid contact", () => {
+  assert.throws(
+    () => loadConfig({ VAPID_PUBLIC_KEY: "public-only" }),
+    /должны задаваться вместе/
+  );
+  assert.throws(
+    () => loadConfig({
+      VAPID_PUBLIC_KEY: "public",
+      VAPID_PRIVATE_KEY: "private",
+      VAPID_SUBJECT: "not-a-contact"
+    }),
+    /VAPID_SUBJECT/
+  );
+  const config = loadConfig({
+    VAPID_PUBLIC_KEY: "public",
+    VAPID_PRIVATE_KEY: "private",
+    VAPID_SUBJECT: "mailto:admin@example.com"
+  });
+  assert.equal(config.isPushConfigured, true);
+});
+
+test("push subscription manager persists subscriptions and sends a confirmation", async () => {
+  const { mkdtemp, readFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-push-"));
+  const sent = [];
+  const client = {
+    setVapidDetails(subject, publicKey, privateKey) {
+      assert.equal(subject, "mailto:admin@example.com");
+      assert.equal(publicKey, "test-public");
+      assert.equal(privateKey, "test-private");
+    },
+    async sendNotification(subscription, payload) {
+      sent.push({ subscription, payload: JSON.parse(payload) });
+    }
+  };
+  try {
+    const { createPushManager } = await import("../server/src/push.js");
+    const manager = createPushManager({
+      isPushConfigured: true,
+      vapidSubject: "mailto:admin@example.com",
+      vapidPublicKey: "test-public",
+      vapidPrivateKey: "test-private",
+      pushStorePath: join(directory, "subscriptions.json")
+    }, client);
+    const subscription = {
+      endpoint: "https://push.example.test/subscription/one",
+      expirationTime: null,
+      keys: { p256dh: "p256dh-test", auth: "auth-test" }
+    };
+    const result = await manager.saveSubscription(subscription);
+    assert.deepEqual(result, { saved: true, notificationSent: true });
+    assert.equal(await manager.count(), 1);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].payload.body, "Уведомления JARVIS подключены.");
+    const stored = JSON.parse(await readFile(join(directory, "subscriptions.json"), "utf8"));
+    assert.equal(stored[0].endpoint, subscription.endpoint);
+    await manager.removeSubscription(subscription.endpoint);
+    assert.equal(await manager.count(), 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("push subscription routes require bearer authentication and expose only the public VAPID key", async () => {
+  const token = "jarvis-push-test-token-with-at-least-32-bytes";
+  const config = {
+    ...loadConfig({ API_ACCESS_TOKEN: token }),
+    isApiAuthEnabled: true
+  };
+  const saved = [];
+  const pushManager = {
+    configured: true,
+    publicKey: "public-vapid-key",
+    async saveSubscription(value) {
+      saved.push(value);
+      return { saved: true, notificationSent: true };
+    },
+    async removeSubscription(endpoint) {
+      return { removed: endpoint === "https://push.example.test/subscription/one" };
+    }
+  };
+  await withServer({ config, provider: {}, pushManager }, async baseUrl => {
+    const keyResponse = await fetch(`${baseUrl}/api/v1/push/public-key`);
+    assert.equal(keyResponse.status, 200);
+    assert.equal((await keyResponse.json()).publicKey, "public-vapid-key");
+
+    const body = {
+      endpoint: "https://push.example.test/subscription/one",
+      keys: { p256dh: "public-key", auth: "auth-key" }
+    };
+    const denied = await fetch(`${baseUrl}/api/v1/push/subscriptions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    assert.equal(denied.status, 401);
+    assert.equal(saved.length, 0);
+
+    const accepted = await fetch(`${baseUrl}/api/v1/push/subscriptions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(body)
+    });
+    assert.equal(accepted.status, 201);
+    assert.equal((await accepted.json()).notificationSent, true);
+    assert.equal(saved.length, 1);
+
+    const removed = await fetch(`${baseUrl}/api/v1/push/subscriptions`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ endpoint: body.endpoint })
+    });
+    assert.equal(removed.status, 200);
+  });
+});
