@@ -39,8 +39,9 @@ public final class JarvisHTTPAIEngine: JarvisAIEngine, @unchecked Sendable {
     public let mode: JarvisAIEngineMode = .remote
     private let endpoint: URL
     private let session: URLSession
+    private let accessToken: String
 
-    public init?(serverBaseURL: URL, session: URLSession = .shared) {
+    public init?(serverBaseURL: URL, accessToken: String = "", session: URLSession = .shared) {
         guard var components = URLComponents(url: serverBaseURL, resolvingAgainstBaseURL: false) else {
             return nil
         }
@@ -55,6 +56,7 @@ public final class JarvisHTTPAIEngine: JarvisAIEngine, @unchecked Sendable {
         components.fragment = nil
         guard let endpoint = components.url else { return nil }
         self.endpoint = endpoint
+        self.accessToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         self.session = session
     }
 
@@ -79,6 +81,9 @@ public final class JarvisHTTPAIEngine: JarvisAIEngine, @unchecked Sendable {
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if !accessToken.isEmpty {
+            request.setValue("Bearer \\(accessToken)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = try JSONEncoder().encode(payload)
 
         let (data, response) = try await session.data(for: request)
