@@ -94,7 +94,7 @@ struct JarvisVoiceSettingsView: View {
                         HStack {
                             Button("Выбрать") {
                                 selectedVoiceIdentifier = option.id
-                                statusMessage = "Выбран голос «\(option.voice.name)». Это сохранённый выбор для будущего подключения озвучивания диалога."
+                                statusMessage = "Выбран голос «\(option.voice.name)». Он будет использоваться для озвучивания ответов JARVIS."
                             }
                             .buttonStyle(.bordered)
                             Spacer()
