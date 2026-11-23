@@ -78,7 +78,16 @@ struct JarvisConversationView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    synthesizer.stopSpeaking(at: .immediate)
+                    statusMessage = "Озвучивание остановлено."
+                } label: {
+                    Image(systemName: "stop.circle")
+                }
+                .accessibilityLabel("Остановить озвучивание")
+
                 Button("Новый") {
+                    synthesizer.stopSpeaking(at: .immediate)
                     conversationIDString = UUID().uuidString
                     history = []
                     statusMessage = nil
