@@ -30,8 +30,8 @@ public struct JarvisReminderIntentParser: Sendable {
             return (title, nil)
         }
 
-        var targetDate: Date?
         let isoPattern = "\\b(20\\d{2}-\\d{2}-\\d{2})\\b"
+        let baseDate: Date?
         if let dateMatch = firstMatch(isoPattern, in: title),
            let dateRange = Range(dateMatch.range(at: 1), in: title) {
             let formatter = DateFormatter()
@@ -39,16 +39,16 @@ public struct JarvisReminderIntentParser: Sendable {
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = calendar.timeZone
             formatter.dateFormat = "yyyy-MM-dd"
-            targetDate = formatter.date(from: String(title[dateRange]))
-        } else if containsAny(normalized, ["завтра", "завтра", "tomorrow"]) {
-            targetDate = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))
+            baseDate = formatter.date(from: String(title[dateRange]))
+        } else if containsAny(normalized, ["завтра", "tomorrow"]) {
+            baseDate = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))
         } else if containsAny(normalized, ["сегодня", "сьогодні", "today"]) {
-            targetDate = calendar.startOfDay(for: now)
+            baseDate = calendar.startOfDay(for: now)
         } else {
-            targetDate = calendar.startOfDay(for: now)
+            baseDate = calendar.startOfDay(for: now)
         }
 
-        guard let baseDate = targetDate else { return (title, nil) }
+        guard let baseDate else { return (title, nil) }
         var components = calendar.dateComponents([.year, .month, .day], from: baseDate)
         components.hour = hour
         components.minute = minute
