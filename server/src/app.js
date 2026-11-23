@@ -4,6 +4,29 @@ import { ProviderError } from "./providers/openai-compatible.js";
 
 const API_PREFIX = "/api/v1";
 
+function createRateLimiter({ windowMs, maxRequests }) {
+  const clients = new Map();
+  return (clientKey, now = Date.now()) => {
+    let entry = clients.get(clientKey);
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 0, resetAt: now + windowMs };
+      clients.set(clientKey, entry);
+    }
+    entry.count += 1;
+
+    if (clients.size > 10_000) {
+      for (const [key, value] of clients) {
+        if (value.resetAt <= now) clients.delete(key);
+      }
+    }
+
+    return {
+      allowed: entry.count <= maxRequests,
+      retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - now) / 1000))
+    };
+  };
+}
+
 function sendJson(response, status, payload, origin) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -88,6 +111,11 @@ function validateChatPayload(payload) {
 }
 
 export function createAppServer({ config, provider }) {
+  const checkRateLimit = createRateLimiter({
+    windowMs: config.rateLimitWindowMs || 60_000,
+    maxRequests: config.rateLimitMaxRequests || 20
+  });
+
   return createServer(async (request, response) => {
     const origin = request.headers.origin || "";
     const allowedOrigin = config.appOrigin && origin === config.appOrigin ? origin : "";
@@ -119,6 +147,16 @@ export function createAppServer({ config, provider }) {
     }
 
     if (request.method === "POST" && path === `${API_PREFIX}/chat`) {
+      const clientKey = request.socket.remoteAddress || "unknown";
+      const limit = checkRateLimit(clientKey);
+      if (!limit.allowed) {
+        response.setHeader("Retry-After", String(limit.retryAfterSeconds));
+        sendJson(response, 429, {
+          error: { code: "RATE_LIMITED", message: "Слишком много запросов. Подождите немного и повторите." }
+        }, allowedOrigin);
+        return;
+      }
+
       if (!config.isAiConfigured) {
         sendJson(response, 503, {
           error: { code: "AI_NOT_CONFIGURED", message: "ИИ пока не настроен на сервере." }
