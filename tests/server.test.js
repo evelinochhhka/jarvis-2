@@ -15,6 +15,14 @@ async function withServer(options, run) {
   }
 }
 
+test("defaults select the strongest current free reasoning candidate", () => {
+  const config = loadConfig({});
+  assert.equal(config.provider, "openrouter");
+  assert.equal(config.baseUrl, "https://openrouter.ai/api/v1");
+  assert.equal(config.model, "nvidia/nemotron-3-ultra-550b-a55b:free");
+  assert.equal(config.isAiConfigured, false);
+});
+
 test("health reports API and AI configuration without exposing secrets", async () => {
   const config = loadConfig({ AI_API_KEY: "private-test-key" });
   await withServer({ config, provider: {} }, async (baseUrl) => {
