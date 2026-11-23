@@ -55,6 +55,14 @@ struct JarvisHomeView: View {
                 .buttonStyle(.bordered)
 
                 NavigationLink {
+                    JarvisFilesView()
+                } label: {
+                    Label("Файлы", systemImage: "folder")
+                        .frame(maxWidth: .infinity).padding()
+                }
+                .buttonStyle(.bordered)
+
+                NavigationLink {
                     JarvisMemoryView()
                 } label: {
                     Label("Память", systemImage: "brain.head.profile")
@@ -86,7 +94,7 @@ struct JarvisHomeView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Text("Локальные списки и память работают без сети. Полноценный офлайн-ИИ пока не подключён.")
+                Text("Локальные списки, память и файлы работают без сети. Полноценный офлайн-ИИ пока не подключён.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding()
