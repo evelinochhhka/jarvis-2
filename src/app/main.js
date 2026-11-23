@@ -5,6 +5,7 @@ import {
   updateItem
 } from "../features/lists/list-store.js";
 import {
+  checkServer,
   deletePushReminder,
   listPushReminders,
   savePushReminder,
@@ -574,6 +575,65 @@ function renderSettings() {
     "Файл резервной копии содержит ваши личные записи. Храните его в безопасном месте и не публикуйте."
   ));
   shell.append(panel);
+
+  const apiPanel = element("section", "panel");
+  apiPanel.style.marginTop = "14px";
+  apiPanel.append(element("div", "panel-title", "СОЕДИНЕНИЕ С ИИ-СЕРВЕРОМ"));
+  apiPanel.append(element("p", "module-description",
+    "Укажите адрес развёрнутого JARVIS API. Ключ модели хранится только на сервере. Здесь указывается адрес сервера, а не ключ OpenRouter."
+  ));
+  const apiUrlInput = element("input", "module-input");
+  apiUrlInput.type = "url";
+  apiUrlInput.autocomplete = "url";
+  apiUrlInput.placeholder = "https://ваш-сервер.onrender.com";
+  apiUrlInput.value = localStorage.getItem("jarvis-2-api-base-url") || "";
+  apiUrlInput.setAttribute("aria-label", "Адрес API сервера JARVIS");
+  const apiActions = element("div", "module-toolbar");
+  const saveApiUrl = element("button", "module-button", "Сохранить адрес");
+  saveApiUrl.type = "button";
+  const testApi = element("button", "module-button", "Проверить ИИ");
+  testApi.type = "button";
+  const apiStatus = element("p", "module-notice", "Сервер пока не проверен.");
+  saveApiUrl.addEventListener("click", () => {
+    const value = apiUrlInput.value.trim();
+    if (!value) {
+      localStorage.removeItem("jarvis-2-api-base-url");
+      apiStatus.textContent = "Используется адрес API текущего сайта.";
+      return;
+    }
+    try {
+      const parsed = new URL(value);
+      if (!["https:", "http:"].includes(parsed.protocol) || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+        throw new Error("Укажите только базовый HTTPS-адрес сервера, без путей.");
+      }
+      if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        throw new Error("Для удалённого сервера требуется HTTPS.");
+      }
+      localStorage.setItem("jarvis-2-api-base-url", parsed.origin);
+      apiUrlInput.value = parsed.origin;
+      apiStatus.textContent = "Адрес сохранён. Теперь проверьте соединение.";
+    } catch (error) {
+      apiStatus.textContent = error.message || "Некорректный адрес сервера.";
+    }
+  });
+  testApi.addEventListener("click", async () => {
+    testApi.disabled = true;
+    testApi.textContent = "Проверка...";
+    try {
+      const health = await checkServer();
+      apiStatus.textContent = health.aiConfigured
+        ? "Соединение установлено. Сервер подтверждает, что ИИ настроен."
+        : "Сервер доступен, но ключ ИИ или настройки модели ещё не заданы.";
+    } catch (error) {
+      apiStatus.textContent = error.message || "Не удалось связаться с сервером.";
+    } finally {
+      testApi.disabled = false;
+      testApi.textContent = "Проверить ИИ";
+    }
+  });
+  apiActions.append(saveApiUrl, testApi);
+  apiPanel.append(apiUrlInput, apiActions, apiStatus);
+  shell.append(apiPanel);
 
   const accessPanel = element("section", "panel");
   accessPanel.style.marginTop = "14px";
