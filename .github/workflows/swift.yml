@@ -1,6 +1,6 @@
 name: Swift native core and app builds
 concurrency:
-  group: native-builds-${{ github.ref }}
+  group: native-builds-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 on:
   workflow_dispatch:
@@ -35,5 +35,7 @@ jobs:
         run: xcodegen generate --spec native/project.yml --project native
       - name: Build iOS simulator app
         run: xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2 -destination 'generic/platform=iOS Simulator' -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+      - name: Build iOS device app (unsigned validation)
+        run: xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2 -destination 'generic/platform=iOS' -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
       - name: Build watchOS simulator app
         run: xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2Watch -destination 'generic/platform=watchOS Simulator' -configuration Debug ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
