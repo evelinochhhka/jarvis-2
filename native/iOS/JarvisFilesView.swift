@@ -39,11 +39,16 @@ struct JarvisFilesView: View {
 
             Section("Мои файлы") {
                 if files.isEmpty {
-                    ContentUnavailableView(
-                        "Пока нет файлов",
-                        systemImage: "doc",
-                        description: Text("Добавьте документ, изображение или другой файл через системный выбор.")
-                    )
+                    VStack(spacing: 8) {
+                        Image(systemName: "doc").font(.largeTitle).foregroundStyle(.secondary)
+                        Text("Пока нет файлов").font(.headline)
+                        Text("Добавьте документ, изображение или другой файл через системный выбор.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
                 } else {
                     ForEach(files) { file in
                         HStack(spacing: 12) {
@@ -52,8 +57,7 @@ struct JarvisFilesView: View {
                                 .foregroundStyle(.secondary)
                                 .frame(width: 32)
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(file.url.lastPathComponent)
-                                    .lineLimit(2)
+                                Text(file.url.lastPathComponent).lineLimit(2)
                                 Text("\(ByteCountFormatter.string(fromByteCount: file.size, countStyle: .file)) · \(file.modifiedAt.formatted(date: .abbreviated, time: .shortened))")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -64,17 +68,20 @@ struct JarvisFilesView: View {
                             }
                             .accessibilityLabel("Поделиться файлом")
                             Menu {
-                                Button("Переименовать", systemImage: "pencil") {
+                                Button {
                                     fileToRename = file
                                     renameDraft = file.url.deletingPathExtension().lastPathComponent
                                     showingRename = true
+                                } label: {
+                                    Label("Переименовать", systemImage: "pencil")
                                 }
-                                Button("Удалить", systemImage: "trash", role: .destructive) {
+                                Button(role: .destructive) {
                                     delete(file)
+                                } label: {
+                                    Label("Удалить", systemImage: "trash")
                                 }
                             } label: {
-                                Image(systemName: "ellipsis")
-                                    .padding(.horizontal, 4)
+                                Image(systemName: "ellipsis").padding(.horizontal, 4)
                             }
                             .accessibilityLabel("Действия с файлом")
                         }
@@ -145,8 +152,7 @@ struct JarvisFilesView: View {
                 defer {
                     if didAccess { source.stopAccessingSecurityScopedResource() }
                 }
-                let fileName = uniqueFileName(for: source.lastPathComponent)
-                let destination = storageDirectory.appendingPathComponent(fileName)
+                let destination = storageDirectory.appendingPathComponent(uniqueFileName(for: source.lastPathComponent))
                 try FileManager.default.copyItem(at: source, to: destination)
             }
             reload()
