@@ -1,9 +1,13 @@
 import AppIntents
 import Foundation
 
+/// Siri entry point for opening JARVIS directly in its voice-capture screen.
+/// This shortcut is registered by iOS when the signed JARVIS app is installed.
 struct OpenJarvisIntent: AppIntent {
-    static var title: LocalizedStringResource = "Открыть JARVIS"
-    static var description = IntentDescription("Запускает голосовой интерфейс JARVIS.")
+    static var title: LocalizedStringResource = "Позвать JARVIS"
+    static var description = IntentDescription(
+        "Открывает JARVIS и сразу переходит к голосовому вводу."
+    )
     static var openAppWhenRun = true
 
     func perform() async throws -> some IntentResult {
@@ -17,10 +21,14 @@ struct JarvisAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: OpenJarvisIntent(),
             phrases: [
-                "Позови \(.applicationName)",
-                "Открой \(.applicationName)",
-                "Поклич \(.applicationName)",
-                "Відкрий \(.applicationName)"
+                "Запусти \\(.applicationName)",
+                "Открой \\(.applicationName)",
+                "Позови \\(.applicationName)",
+                "Начни разговор с \\(.applicationName)",
+                "Вызови \\(.applicationName)",
+                "Поклич \\(.applicationName)",
+                "Відкрий \\(.applicationName)",
+                "Поклич \\(.applicationName)"
             ],
             shortTitle: "Позвать JARVIS",
             systemImageName: "waveform"
