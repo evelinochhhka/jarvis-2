@@ -53,7 +53,7 @@ export function loadConfig(env = process.env) {
     vapidPublicKey: pushPublicKey,
     vapidPrivateKey: pushPrivateKey,
     vapidSubject: pushSubject,
-    pushStorePath: (env.PUSH_STORE_PATH || "server/data/push-subscriptions.json").trim(),
+    pushStorePath: (env.PUSH_STORE_PATH || "server/data/push-subscriptions.json").trim(),\n    reminderStorePath: (env.REMINDER_STORE_PATH || "server/data/push-reminders.json").trim(),
     isPushConfigured: Boolean(pushPublicKey && pushPrivateKey && pushSubject),
     isAiConfigured: Boolean(apiKey && model && baseUrl)
   };
