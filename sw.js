@@ -1,4 +1,4 @@
-const CACHE_NAME = "jarvis-2-v4";
+const CACHE_NAME = "jarvis-2-v5";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./src/features/lists/list-store.js",
   "./src/services/storage/local-store.js",
   "./src/services/api/client.js",
+  "./src/services/ai/local-engine.js",
   "./src/features/communications/communications.js",
   "./src/features/communications/push-client.js",
   "./src/features/focus/focus-shortcuts.js"
