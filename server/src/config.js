@@ -12,6 +12,7 @@ export function loadConfig(env = process.env) {
   const model = (env.AI_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free").trim();
   const apiKey = (env.AI_API_KEY || "").trim();
   const appOrigin = (env.APP_ORIGIN || "").trim();
+  const apiAccessToken = (env.API_ACCESS_TOKEN || "").trim();
 
   return {
     host: (env.HOST || "127.0.0.1").trim(),
@@ -21,6 +22,8 @@ export function loadConfig(env = process.env) {
     model,
     apiKey,
     appOrigin,
+    apiAccessToken,
+    isApiAuthEnabled: Boolean(apiAccessToken),
     maxRequestBytes: readPositiveInteger(env.MAX_REQUEST_BYTES, 16_384, 65_536),
     requestTimeoutMs: readPositiveInteger(env.AI_TIMEOUT_MS, 25_000, 60_000),
     rateLimitWindowMs: readPositiveInteger(env.RATE_LIMIT_WINDOW_MS, 60_000, 3_600_000),
