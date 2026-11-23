@@ -326,6 +326,55 @@ function renderList(type) {
   return shell;
 }
 
+function runLocalCommand(message) {
+  const text = message.trim();
+  const normalized = text.toLocaleLowerCase("ru-RU");
+  const aliases = [
+    { type: "tasks", names: ["хочу сделать", "задачи", "список задач"] },
+    { type: "watchlist", names: ["хочу посмотреть", "посмотреть", "фильмы", "сериалы"] },
+    { type: "wishlist", names: ["мои хотелки", "хотелки", "покупки"] },
+    { type: "reminders", names: ["напоминания", "напомни", "напоминание"] }
+  ];
+  const target = aliases.find((entry) => entry.names.some((name) => normalized.includes(name)));
+  const addToList = text.match(/^(?:добавь|запиши|сохрани)\s+(.+?)\s+в\s+(.+)$/i);
+  if (addToList) {
+    const destination = addToList[2].toLocaleLowerCase("ru-RU");
+    const type = aliases.find((entry) => entry.names.some((name) => destination.includes(name)))?.type;
+    if (type) {
+      const item = addItem(type, { title: addToList[1].trim() });
+      return "Сохранено в список «" + listConfig[type].title + "»: " + item.title + ".";
+    }
+  }
+  const showIntent = /^(?:покажи|что у меня|что записано|открой|список)\b/i.test(text);
+  if (showIntent && target) {
+    const items = getItems(target.type);
+    if (!items.length) return "В списке «" + listConfig[target.type].title + "» пока пусто.";
+    return "В списке «" + listConfig[target.type].title + "» " + items.length + " записей:\n" +
+      items.slice(0, 15).map((item, index) =>
+        (index + 1) + ". " + item.title + (item.completed ? " (выполнено)" : "")
+      ).join("\n");
+  }
+  const doneMatch = text.match(/^(?:отметь|закрой|выполни)\s+(.+?)\s+(?:как\s+)?(?:выполненным|выполненной|готово)$/i);
+  if (doneMatch) {
+    const needle = doneMatch[1].toLocaleLowerCase("ru-RU");
+    for (const entry of aliases.filter((item) => item.type !== "reminders")) {
+      const item = getItems(entry.type).find((candidate) => candidate.title.toLocaleLowerCase("ru-RU").includes(needle));
+      if (item) { updateItem(entry.type, item.id, { completed: true }); return "Отметила «" + item.title + "» как выполненное."; }
+    }
+    return "Не нашла запись «" + doneMatch[1] + "» в ваших списках.";
+  }
+  return null;
+}
+
+function speakText(text) {
+  if (!("speechSynthesis" in window)) return false;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ru-RU";
+  utterance.rate = 1;
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
 function renderChat() {
   const shell = createModuleShell("Диалог", "История диалога сохраняется локально на этом устройстве. Ответы ИИ требуют настроенного сервера.");
   const log = element("div", "chat-log");
@@ -366,9 +415,35 @@ function renderChat() {
   input.rows = 2;
   input.required = true;
   input.setAttribute("aria-label", "Сообщение ассистенту");
+  const controls = element("div", "module-toolbar");
+  const voice = element("button", "module-button", "Говорить");
+  voice.type = "button";
+  voice.setAttribute("aria-label", "Надиктовать сообщение");
   const send = element("button", "module-button", "Отправить");
   send.type = "submit";
-  form.append(input, send);
+  controls.append(voice, send);
+  form.append(input, controls);
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    voice.disabled = true;
+    voice.title = "Распознавание речи не поддерживается этим браузером";
+  } else {
+    voice.addEventListener("click", () => {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "ru-RU";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      voice.disabled = true;
+      voice.textContent = "Слушаю...";
+      recognition.onresult = (event) => { input.value = event.results?.[0]?.[0]?.transcript || ""; input.focus(); };
+      recognition.onerror = () => { log.append(element("div", "chat-message system", "Не удалось распознать речь. Проверьте разрешение микрофона или введите сообщение текстом.")); };
+      recognition.onend = () => { voice.disabled = false; voice.textContent = "Говорить"; };
+      try { recognition.start(); } catch (error) {
+        voice.disabled = false; voice.textContent = "Говорить";
+        log.append(element("div", "chat-message system", error.message));
+      }
+    });
+  }
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = input.value.trim();
@@ -378,15 +453,28 @@ function renderChat() {
     send.disabled = true;
     send.textContent = "Отправка...";
     try {
-      const clientRequestId = globalThis.crypto?.randomUUID?.() || `request-${Date.now()}`;
-      const result = await sendChatMessage({
-        message,
-        conversationId,
-        clientRequestId,
-        history: history.slice(-20)
+      const localAnswer = runLocalCommand(message);
+      let answer;
+      if (localAnswer) {
+        answer = localAnswer;
+      } else {
+        const clientRequestId = globalThis.crypto?.randomUUID?.() || `request-${Date.now()}`;
+        const result = await sendChatMessage({
+          message,
+          conversationId,
+          clientRequestId,
+          history: history.slice(-20)
+        });
+        answer = result?.message?.content || "Сервер вернул пустой ответ.";
+      }
+      const responseRow = element("div", "chat-message", answer);
+      const speak = element("button", "module-button", "Озвучить");
+      speak.type = "button";
+      speak.addEventListener("click", () => {
+        if (!speakText(answer)) log.append(element("div", "chat-message system", "Озвучивание не поддерживается этим браузером."));
       });
-      const answer = result?.message?.content || "Сервер вернул пустой ответ.";
-      log.append(element("div", "chat-message", answer));
+      responseRow.append(document.createTextNode(" "), speak);
+      log.append(responseRow);
       history = [
         ...history,
         { role: "user", content: message },
