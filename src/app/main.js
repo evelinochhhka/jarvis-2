@@ -68,6 +68,9 @@ function addStyles() {
     .chat-message.user { justify-self: end; border-color: #405763; background: #1c2a31; }
     .chat-message.system { max-width: 100%; color: #c2a7a7; }
     .chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+    .ai-status-panel { margin-bottom: 18px; }
+    .ai-progress { display: block; width: 100%; height: 8px; margin: 12px 0; accent-color: var(--blue); }
+    .ai-status-panel .module-button { margin-top: 8px; }
     .module-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
     @media (max-width: 560px) {
       .module-form { grid-template-columns: 1fr; }
