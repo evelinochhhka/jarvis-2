@@ -56,7 +56,7 @@ export function createOpenAICompatibleProvider(config, fetchImpl = fetch) {
               { role: "user", content: message }
             ],
             ...(config.provider === "openrouter"
-              ? { max_tokens: 1200, reasoning: { effort: "high" } }
+              ? { max_tokens: 4096, reasoning: { effort: "high" } }
               : { max_completion_tokens: 1200 })
           }),
           signal: AbortSignal.timeout(config.requestTimeoutMs)
