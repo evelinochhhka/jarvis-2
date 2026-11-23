@@ -1,6 +1,9 @@
 name: JARVIS 2 manual test preview
 
 on:
+  push:
+    branches:
+      - foundation/architecture
   workflow_dispatch:
 
 permissions:
