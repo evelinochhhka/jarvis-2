@@ -211,3 +211,63 @@ test("chat endpoint applies a per-client rate limit", async () => {
     assert.ok(Number(second.headers.get("retry-after")) >= 1);
   });
 });
+
+
+test("chat requires a configured bearer token and rejects missing or incorrect tokens", async () => {
+  const config = {
+    ...loadConfig({ AI_API_KEY: "test-key", API_ACCESS_TOKEN: "a-long-test-access-token" }),
+    rateLimitMaxRequests: 10
+  };
+  let called = false;
+  const provider = { async generateReply() { called = true; return "Ответ"; } };
+  await withServer({ config, provider }, async (baseUrl) => {
+    for (const authorization of [undefined, "Bearer wrong-token"]) {
+      const response = await fetch(`${baseUrl}/api/v1/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authorization ? { Authorization: authorization } : {})
+        },
+        body: JSON.stringify({ message: "Привет" })
+      });
+      const payload = await response.json();
+      assert.equal(response.status, 401);
+      assert.equal(payload.error.code, "UNAUTHORIZED");
+    }
+    assert.equal(called, false);
+  });
+});
+
+test("chat accepts the configured bearer token", async () => {
+  const token = "a-long-test-access-token";
+  const config = {
+    ...loadConfig({ AI_API_KEY: "test-key", API_ACCESS_TOKEN: token }),
+    rateLimitMaxRequests: 10
+  };
+  const provider = { async generateReply() { return "Авторизованный ответ"; } };
+  await withServer({ config, provider }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ message: "Привет" })
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(payload.message.content, "Авторизованный ответ");
+  });
+});
+
+test("CORS preflight permits the Authorization header", async () => {
+  const config = { ...loadConfig({}), appOrigin: "https://jarvis.example" };
+  await withServer({ config, provider: {} }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/chat`, {
+      method: "OPTIONS",
+      headers: { Origin: "https://jarvis.example" }
+    });
+    assert.equal(response.status, 204);
+    assert.match(response.headers.get("access-control-allow-headers"), /Authorization/i);
+  });
+});
