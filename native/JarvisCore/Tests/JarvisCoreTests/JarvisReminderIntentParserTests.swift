@@ -19,13 +19,14 @@ final class JarvisReminderIntentParserTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(result.title, "купить тетради")
-        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: result.schedule!.date)
+        let schedule = try! XCTUnwrap(result.schedule)
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: schedule.date)
         XCTAssertEqual(parts.year, 2026)
         XCTAssertEqual(parts.month, 11)
         XCTAssertEqual(parts.day, 24)
         XCTAssertEqual(parts.hour, 18)
         XCTAssertEqual(parts.minute, 30)
-        XCTAssertEqual(result.schedule?.repeatFrequency, .none)
+        XCTAssertEqual(schedule.repeatFrequency, JarvisReminderRepeat.none)
     }
 
     func testUkrainianDailyReminderExtractsRecurrence() {
@@ -35,8 +36,8 @@ final class JarvisReminderIntentParserTests: XCTestCase {
             calendar: calendar
         )
         XCTAssertEqual(result.title, "зателефонувати лікарю")
-        XCTAssertEqual(result.schedule?.repeatFrequency, .daily)
-        let parts = calendar.dateComponents([.day, .hour, .minute], from: result.schedule!.date)
+        XCTAssertEqual(result.schedule?.repeatFrequency, JarvisReminderRepeat.daily)
+        let parts = calendar.dateComponents([.day, .hour, .minute], from: try! XCTUnwrap(result.schedule).date)
         XCTAssertEqual(parts.day, 23)
         XCTAssertEqual(parts.hour, 17)
         XCTAssertEqual(parts.minute, 45)
