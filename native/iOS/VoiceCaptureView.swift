@@ -23,6 +23,7 @@ struct VoiceCaptureView: View {
     @State private var queueMessage: String?
     @State private var queueError: String?
     private let processor = JarvisCommandProcessor()
+    private let reminderScheduler = JarvisReminderScheduler()
 
     var body: some View {
         NavigationStack {
@@ -75,10 +76,24 @@ struct VoiceCaptureView: View {
             do {
                 let result = try await processor.process(recognizer.transcript)
                 switch result {
-                case let .saved(list, _):
-                    queueMessage = "Сохранено в раздел «\(list.title)»."
+                case let .saved(list, entryID):
+                    if list == .reminders {
+                        let entries = try await processor.entries(in: .reminders)
+                        if let entry = entries.first(where: { $0.id == entryID }) {
+                            do {
+                                try await reminderScheduler.schedule(entry)
+                                queueMessage = "Напоминание сохранено, уведомление запланировано."
+                            } catch {
+                                queueMessage = "Напоминание сохранено, но уведомление не создано. Проверьте разрешения и дату."
+                            }
+                        } else {
+                            queueMessage = "Напоминание сохранено, но его расписание не удалось проверить."
+                        }
+                    } else {
+                        queueMessage = "Сохранено в раздел «\(list.title)»."
+                    }
                 case .savedReminderNeedsSchedule:
-                    queueMessage = "Напоминание сохранено. Укажите дату и время в разделе «Мои списки», чтобы включить уведомление."
+                    queueMessage = "Напоминание сохранено без даты и времени. Чтобы включить уведомление, создайте запись заново в разделе «Мои списки» с расписанием."
                 case .requiresAI:
                     queueMessage = "Запрос сохранён. Для ответа требуется подключить ИИ-модель."
                 }
