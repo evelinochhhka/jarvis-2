@@ -144,10 +144,33 @@ struct JarvisConversationView: View {
     }
 
     private func speak(_ text: String) {
-        let isUkrainian = text.range(of: "[іїєґІЇЄҐ]", options: .regularExpression) != nil
-        let identifier = isUkrainian ? selectedUkrainianVoiceIdentifier : selectedRussianVoiceIdentifier
-        guard !identifier.isEmpty,
-              let voice = AVSpeechSynthesisVoice(identifier: identifier) else {
+        let isUkrainian = containsUkrainianSignal(text)
+        let selectedIdentifier = isUkrainian ? selectedUkrainianVoiceIdentifier : selectedRussianVoiceIdentifier
+        let preferredVoice: AVSpeechSynthesisVoice? = {
+            if !selectedIdentifier.isEmpty,
+               let selected = AVSpeechSynthesisVoice(identifier: selectedIdentifier) {
+                return selected
+            }
+            let available = AVSpeechSynthesisVoice.speechVoices()
+            if isUkrainian {
+                let lesya = available.filter {
+                    $0.language.hasPrefix("uk") &&
+                    ($0.name.localizedCaseInsensitiveContains("Леся") ||
+                     $0.name.localizedCaseInsensitiveContains("Lesya"))
+                }
+                return lesya.first(where: { $0.quality == .enhanced || $0.quality == .premium })
+                    ?? lesya.first
+            }
+            return available.first(where: {
+                $0.language.hasPrefix("ru") &&
+                ($0.name.localizedCaseInsensitiveContains("Голос 1") ||
+                 $0.name.localizedCaseInsensitiveContains("Siri Voice 1"))
+            })
+        }()
+        guard let voice = preferredVoice else {
+            statusMessage = isUkrainian
+                ? "Ответ готов, но украинский голос не выбран или не установлен."
+                : "Ответ готов, но русский голос не выбран или не установлен."
             return
         }
         synthesizer.stopSpeaking(at: .immediate)
@@ -155,6 +178,19 @@ struct JarvisConversationView: View {
         utterance.voice = voice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         synthesizer.speak(utterance)
+    }
+
+    private func containsUkrainianSignal(_ text: String) -> Bool {
+        if text.range(of: "[іїєґІЇЄҐ]", options: .regularExpression) != nil {
+            return true
+        }
+        let markers = [
+            "дякую", "будь ласка", "сьогодні", "зараз", "щодня",
+            "можу", "можна", "потрібно", "зробити", "гаразд",
+            "звісно", "відповідь", "підтримує", "зателефонувати",
+            "лікарю", "українською", "допомогти"
+        ]
+        return markers.contains { text.localizedCaseInsensitiveContains($0) }
     }
 
     private func deleteCurrentConversation() {
