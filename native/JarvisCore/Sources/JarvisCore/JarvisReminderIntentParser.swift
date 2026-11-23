@@ -69,7 +69,7 @@ public struct JarvisReminderIntentParser: Sendable {
             title = replacing(pattern, in: title, with: "")
         }
         title = title
-            .replacingOccurrences(of: #"\\s{2,}"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "[[:space:]]{2,}", with: " ", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: " ,;:.-")))
         guard !title.isEmpty else { return (input, nil) }
 
