@@ -58,6 +58,11 @@ export async function enablePushNotifications() {
     throw new Error("На iPhone и iPad откройте JARVIS с иконки на экране «Домой». Push-уведомления для веб-приложений доступны в установленном режиме.");
   }
 
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error("Разрешение на уведомления не предоставлено.");
+  }
+
   const registration = await navigator.serviceWorker.ready;
   const keyResponse = await fetch(`${API_BASE}/push/public-key`, {
     headers: { Accept: "application/json" },
@@ -65,11 +70,6 @@ export async function enablePushNotifications() {
   });
   const keyPayload = await readJson(keyResponse);
   const applicationServerKey = decodeApplicationServerKey(keyPayload.publicKey);
-
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    throw new Error("Разрешение на уведомления не предоставлено.");
-  }
 
   let subscription = await registration.pushManager.getSubscription();
   if (!subscription) {
