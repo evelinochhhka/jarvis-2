@@ -404,3 +404,78 @@ test("push subscription routes require bearer authentication and expose only the
     assert.equal(removed.status, 200);
   });
 });
+
+
+test("push reminder scheduler stores and delivers one-time reminders only when a device is subscribed", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-reminders-"));
+  let subscriptions = 0;
+  const sent = [];
+  const pushManager = {
+    configured: true,
+    async count() { return subscriptions; },
+    async sendToAll(payload) {
+      sent.push(payload);
+      return { sent: 1, failed: 0 };
+    }
+  };
+  try {
+    const { createReminderScheduler } = await import("../server/src/reminders.js");
+    const scheduler = createReminderScheduler({
+      reminderStorePath: join(directory, "reminders.json")
+    }, pushManager, { startTimer: false });
+    const reminder = await scheduler.save({
+      id: "one-time-1",
+      title: "Подготовить презентацию",
+      dueAt: "2026-11-22T10:00:00.000Z",
+      timeZone: "Europe/Kyiv",
+      repeat: { frequency: "none", interval: 1 }
+    });
+    assert.equal(reminder.id, "one-time-1");
+    assert.equal((await scheduler.list()).length, 1);
+    const now = new Date("2026-11-23T10:00:00.000Z");
+    assert.deepEqual(await scheduler.tick(now), { processed: 0 });
+    assert.equal(sent.length, 0);
+    subscriptions = 1;
+    assert.deepEqual(await scheduler.tick(now), { processed: 1 });
+    assert.equal(sent[0].body, "Подготовить презентацию");
+    assert.equal((await scheduler.list()).length, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("push reminder scheduler advances recurring reminders in their local timezone", async () => {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-repeat-"));
+  const pushManager = {
+    configured: true,
+    async count() { return 1; },
+    async sendToAll() { return { sent: 1, failed: 0 }; }
+  };
+  try {
+    const { createReminderScheduler } = await import("../server/src/reminders.js");
+    const scheduler = createReminderScheduler({
+      reminderStorePath: join(directory, "reminders.json")
+    }, pushManager, { startTimer: false });
+    await scheduler.save({
+      id: "daily-1",
+      title: "Проверить расписание",
+      dueAt: "2026-11-22T08:00:00.000Z",
+      timeZone: "Europe/Kyiv",
+      repeat: { frequency: "daily", interval: 1 }
+    });
+    const now = new Date("2026-11-22T09:00:00.000Z");
+    assert.deepEqual(await scheduler.tick(now), { processed: 1 });
+    const [next] = await scheduler.list();
+    assert.ok(Date.parse(next.dueAt) > now.getTime());
+    assert.equal(next.timeZone, "Europe/Kyiv");
+    assert.equal(next.repeat.frequency, "daily");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
