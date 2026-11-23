@@ -48,9 +48,7 @@ struct JarvisWorkspaceView: View {
             }
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                Text(errorMessage).font(.footnote).foregroundStyle(.red)
             }
 
             if entries.isEmpty {
@@ -222,12 +220,14 @@ struct JarvisWorkspaceView: View {
                 try await store.setCompleted(id: entry.id, isCompleted: value)
                 if value {
                     reminderScheduler.cancel(entryID: entry.id)
-                } else if let refreshed = try await store.all(in: selectedList).first(where: { $0.id == entry.id }),
-                          refreshed.list == .reminders {
-                    do {
-                        try await reminderScheduler.schedule(refreshed)
-                    } catch {
-                        errorMessage = "Запись активирована, но уведомление не удалось восстановить."
+                } else if entry.list == .reminders {
+                    let refreshedEntries = try await store.all(in: selectedList)
+                    if let refreshed = refreshedEntries.first(where: { $0.id == entry.id }) {
+                        do {
+                            try await reminderScheduler.schedule(refreshed)
+                        } catch {
+                            errorMessage = "Запись активирована, но уведомление не удалось восстановить."
+                        }
                     }
                 }
                 await reload()
