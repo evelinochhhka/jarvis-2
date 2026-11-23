@@ -82,7 +82,7 @@ public final class JarvisHTTPAIEngine: JarvisAIEngine, @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if !accessToken.isEmpty {
-            request.setValue("Bearer \\(accessToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
         request.httpBody = try JSONEncoder().encode(payload)
 
