@@ -9,7 +9,7 @@ const pushManager = createPushManager(config);
 const server = createAppServer({ config, provider, pushManager });
 
 server.listen(config.port, config.host, () => {
-  process.stdout.write(`JARVIS 2 API listening on http://${config.host}:${config.port}\\n`);
+  process.stdout.write(`JARVIS 2 API listening on http://${config.host}:${config.port}\n`);
 });
 
 function shutdown() {
