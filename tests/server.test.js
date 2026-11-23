@@ -187,3 +187,27 @@ test("OpenRouter Nemotron requests extended reasoning through the compatible cha
   assert.equal(captured.options.headers.Authorization, "Bearer test-openrouter-key");
   assert.equal(captured.options.headers["X-Title"], "JARVIS 2");
 });
+
+
+test("chat endpoint applies a per-client rate limit", async () => {
+  const config = {
+    ...loadConfig({ AI_API_KEY: "test-key" }),
+    rateLimitWindowMs: 60_000,
+    rateLimitMaxRequests: 1
+  };
+  const provider = { async generateReply() { return "Ответ"; } };
+  await withServer({ config, provider }, async (baseUrl) => {
+    const send = () => fetch(`${baseUrl}/api/v1/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "Привет" })
+    });
+    const first = await send();
+    const second = await send();
+    const payload = await second.json();
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 429);
+    assert.equal(payload.error.code, "RATE_LIMITED");
+    assert.ok(Number(second.headers.get("retry-after")) >= 1);
+  });
+});
