@@ -121,9 +121,12 @@ function validateChatPayload(payload) {
 }
 
 function sendApiError(response, error, origin, fallbackCode = "SERVER_ERROR") {
-  const status = error.status || 400;
+  const status = error.status || 500;
   const code = error.code || fallbackCode;
-  sendJson(response, status, { error: { code, message: error.message || "Не удалось обработать запрос." } }, origin);
+  const message = status >= 500
+    ? "Внутренняя ошибка сервера."
+    : error.message || "Не удалось обработать запрос.";
+  sendJson(response, status, { error: { code, message } }, origin);
 }
 
 export function createAppServer({ config, provider, pushManager = null }) {
