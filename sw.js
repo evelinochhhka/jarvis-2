@@ -1,36 +1,39 @@
-const CACHE_NAME = "jarvis-2-v5";
+const CACHE_NAME = "jarvis-2-app-v6";
 const APP_SHELL = [
-  "./",
   "./index.html",
   "./manifest.json",
+  "./icon.svg",
+  "./style.css",
   "./src/app/main.js",
   "./src/features/lists/list-store.js",
-  "./src/services/storage/local-store.js",
-  "./src/services/api/client.js",
-  "./src/services/ai/local-engine.js",
+  "./src/features/files/files.js",
+  "./src/features/files/file-store.js",
   "./src/features/communications/communications.js",
   "./src/features/communications/push-client.js",
-  "./src/features/focus/focus-shortcuts.js"
+  "./src/features/focus/focus-shortcuts.js",
+  "./src/services/storage/local-store.js",
+  "./src/services/api/client.js",
+  "./src/services/ai/local-engine.js"
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
-  );
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(APP_SHELL);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key.startsWith("jarvis-2-") && key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter(key => key.startsWith("jarvis-2-") && key !== CACHE_NAME)
+        .map(key => caches.delete(key))
+    );
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", event => {
@@ -38,45 +41,40 @@ self.addEventListener("fetch", event => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.includes("/api/")) return;
+  if (url.origin !== self.location.origin || url.pathname.includes("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put("./index.html", copy));
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match("./index.html");
-          return cached || Response.error();
-        })
-    );
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put("./index.html", response.clone());
+        }
+        return response;
+      } catch {
+        return (await caches.match("./index.html")) || Response.error();
+      }
+    })());
     return;
   }
 
-  const isAppAsset = ["script", "style", "image", "font"].includes(request.destination);
-  if (!isAppAsset) return;
+  event.respondWith((async () => {
+    const cached = await caches.match(request);
+    if (cached) return cached;
 
-  event.respondWith(
-    caches.match(request).then(async cached => {
-      if (cached) return cached;
-
+    try {
       const response = await fetch(request);
       if (response.ok && response.type === "basic") {
-        const copy = response.clone();
         const cache = await caches.open(CACHE_NAME);
-        await cache.put(request, copy);
+        await cache.put(request, response.clone());
       }
       return response;
-    })
-  );
+    } catch {
+      return Response.error();
+    }
+  })());
 });
-
 
 self.addEventListener("push", event => {
   event.waitUntil((async () => {
@@ -90,7 +88,7 @@ self.addEventListener("push", event => {
     const options = {
       body: typeof payload.body === "string" ? payload.body : "У вас новое уведомление.",
       tag: typeof payload.tag === "string" ? payload.tag : "jarvis-notification",
-      data: { url: typeof payload.url === "string" ? payload.url : "./" }
+      data: { url: typeof payload.url === "string" ? payload.url : "./index.html" }
     };
     await self.registration.showNotification(title, options);
   })());
@@ -98,7 +96,7 @@ self.addEventListener("push", event => {
 
 self.addEventListener("notificationclick", event => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || "./", self.location.origin).href;
+  const target = new URL(event.notification.data?.url || "./index.html", self.location.origin).href;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const client of windows) {
