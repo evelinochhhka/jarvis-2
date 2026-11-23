@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { ProviderError } from "./providers/openai-compatible.js";
 
 const API_PREFIX = "/api/v1";
@@ -31,6 +31,15 @@ function createRateLimiter({ windowMs, maxRequests }) {
       retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - now) / 1000))
     };
   };
+}
+
+function hasValidBearerToken(request, expectedToken) {
+  if (!expectedToken) return true;
+  const header = request.headers.authorization || "";
+  if (!header.startsWith("Bearer ")) return false;
+  const supplied = Buffer.from(header.slice(7), "utf8");
+  const expected = Buffer.from(expectedToken, "utf8");
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
 function sendJson(response, status, payload, origin) {
@@ -143,7 +152,7 @@ export function createAppServer({ config, provider }) {
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Accept",
+        "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization",
         "Access-Control-Max-Age": "600",
         ...(allowedOrigin ? { "Access-Control-Allow-Origin": allowedOrigin, Vary: "Origin" } : {})
       });
@@ -161,6 +170,12 @@ export function createAppServer({ config, provider }) {
     }
 
     if (request.method === "POST" && path === `${API_PREFIX}/chat`) {
+      if (!hasValidBearerToken(request, config.apiAccessToken || "")) {
+        sendJson(response, 401, {
+          error: { code: "UNAUTHORIZED", message: "Для доступа к JARVIS требуется действительный токен." }
+        }, allowedOrigin);
+        return;
+      }
       const clientKey = request.socket.remoteAddress || "unknown";
       const limit = checkRateLimit(clientKey);
       if (!limit.allowed) {
