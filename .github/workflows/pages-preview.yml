@@ -1,0 +1,61 @@
+name: JARVIS 2 manual test preview
+
+on:
+  push:
+    branches:
+      - foundation/architecture
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: jarvis-2-pages-preview
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref_name == 'foundation/architecture'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out test branch
+        uses: actions/checkout@v4
+
+      - name: Prepare static PWA preview
+        run: |
+          set -euo pipefail
+          test -f index.html
+          test -f manifest.json
+          test -f sw.js
+          test -d src
+          mkdir -p _site
+          cp index.html manifest.json sw.js _site/
+          cp -R src _site/src
+          test -s _site/index.html
+          test -s _site/src/app/main.js
+          echo "Preview files:"
+          find _site -maxdepth 3 -type f | sort
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload PWA preview
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref_name == 'foundation/architecture'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish test preview
+        id: deployment
+        uses: actions/deploy-pages@v4

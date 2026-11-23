@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>JARVIS использует микрофон только после явного запуска голосового ввода.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>JARVIS преобразует вашу речь в текст для обработки команды на устройстве.</string>
+</dict>
+</plist>

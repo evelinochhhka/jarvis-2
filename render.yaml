@@ -1,0 +1,34 @@
+# Render Blueprint for the JARVIS 2 AI API.
+# Deploy this service, then add the generated HTTPS URL in JARVIS Settings.
+services:
+  - type: web
+    name: jarvis-2-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --omit=dev --no-audit --no-fund
+    startCommand: npm run start:server
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: AI_PROVIDER
+        value: openrouter
+      - key: AI_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: AI_MODEL
+        value: nvidia/nemotron-3-ultra-550b-a55b:free
+      - key: AI_API_KEY
+        sync: false
+      - key: API_ACCESS_TOKEN
+        sync: false
+      - key: APP_ORIGIN
+        value: https://evelinochhhka.github.io
+      - key: AI_TIMEOUT_MS
+        value: "25000"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "20"

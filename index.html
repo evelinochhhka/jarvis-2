@@ -12,6 +12,16 @@
 
   <meta name="theme-color" content="#101316">
 
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/svg+xml" href="./icon.svg">
+  <link rel="apple-touch-icon" href="./icon.svg">
+  <meta name="apple-mobile-web-app-title" content="JARVIS">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <meta name="description" content="JARVIS 2 Personal Assistant">
 
   <title>JARVIS 2</title>
@@ -634,37 +644,37 @@
 
       <div class="nav-label">WORKSPACE</div>
 
-      <button class="nav-item active">
+      <button class="nav-item active" data-view="home">
 
         <span class="nav-icon">⌂</span> Главная
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="chat">
 
         <span class="nav-icon">◈</span> Диалог
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="tasks">
 
         <span class="nav-icon">▤</span> Хочу сделать
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="watchlist">
 
         <span class="nav-icon">◇</span> Хочу посмотреть
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="wishlist">
 
         <span class="nav-icon">✧</span> Мои хотелки
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="reminders">
 
         <span class="nav-icon">◷</span> Напоминания
 
@@ -672,13 +682,13 @@
 
       <div class="nav-label">SYSTEM</div>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="files">
 
         <span class="nav-icon">▧</span> Файлы
 
       </button>
 
-      <button class="nav-item">
+      <button class="nav-item" data-view="settings">
 
         <span class="nav-icon">⚙</span> Настройки
 
@@ -883,6 +893,26 @@
     updateClock();
 
     setInterval(updateClock, 1000);
+
+  </script>
+
+  <script type="module" src="./src/app/main.js"></script>
+
+  <script>
+
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+
+      window.addEventListener("load", () => {
+
+        navigator.serviceWorker.register("./sw.js").catch(error => {
+
+          console.error("JARVIS service worker registration failed:", error);
+
+        });
+
+      });
+
+    }
 
   </script>
 

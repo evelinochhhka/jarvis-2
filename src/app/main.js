@@ -1,0 +1,820 @@
+import {
+  addItem,
+  deleteItem,
+  getItems,
+  updateItem
+} from "../features/lists/list-store.js";
+import {
+  checkServer,
+  deletePushReminder,
+  listPushReminders,
+  savePushReminder
+} from "../services/api/client.js";
+import {
+  generateLocalReply,
+  getLocalAIStatus,
+  initializeLocalAI
+} from "../services/ai/local-engine.js";
+import { renderCommunications } from "../features/communications/communications.js";
+
+const dashboard = document.querySelector(".dashboard");
+const navButtons = [...document.querySelectorAll(".nav-item[data-view]")];
+const homeMarkup = dashboard?.innerHTML || "";
+
+const views = {
+  home: "Главная",
+  chat: "Диалог",
+  tasks: "Хочу сделать",
+  watchlist: "Хочу посмотреть",
+  wishlist: "Мои хотелки",
+  reminders: "Напоминания",
+  files: "Файлы",
+  settings: "Настройки",
+  communications: "Связь и уведомления"
+};
+
+const listConfig = {
+  tasks: { title: "Хочу сделать", description: "Задачи и планы, которые вы хотите выполнить." },
+  watchlist: { title: "Хочу посмотреть", description: "Фильмы, сериалы и видео, к которым вы хотите вернуться." },
+  wishlist: { title: "Мои хотелки", description: "Покупки, идеи и желания, которые стоит сохранить." },
+  reminders: { title: "Напоминания", description: "Локальное расписание с серверной доставкой push после настройки и подписки устройства." }
+};
+
+function addStyles() {
+  const style = document.createElement("style");
+  style.textContent = `
+    .module-heading { margin: 0 0 8px; font-size: clamp(25px, 4vw, 36px); font-weight: 300; }
+    .module-description { color: var(--muted); font-size: 12px; line-height: 1.7; margin-bottom: 24px; }
+    .module-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin: 18px 0 22px; }
+    .module-input, .module-textarea, .module-select { width: 100%; min-width: 0; padding: 12px 13px; color: var(--text); background: #11171b; border: 1px solid var(--line); border-radius: 3px; font: inherit; font-size: 13px; }
+    .module-textarea { min-height: 76px; resize: vertical; grid-column: 1 / -1; }
+    .module-input:focus, .module-textarea:focus, .module-select:focus { outline: 1px solid var(--blue); border-color: var(--blue); }
+    .module-button { padding: 11px 16px; border: 1px solid var(--blue-dim); border-radius: 3px; background: #203039; color: var(--blue); cursor: pointer; font-size: 12px; }
+    .module-button:hover { background: #2a414c; }
+    .module-button.danger { border-color: #63464a; color: #d49a9a; background: #2a1e21; }
+    .module-items { display: grid; gap: 9px; }
+    .module-item { display: flex; align-items: flex-start; gap: 12px; padding: 15px; border: 1px solid var(--line); background: #171e22; }
+    .module-item-main { min-width: 0; flex: 1; }
+    .module-item-title { font-size: 14px; overflow-wrap: anywhere; }
+    .module-item-note, .module-item-meta { color: var(--muted); font-size: 11px; line-height: 1.6; margin-top: 5px; overflow-wrap: anywhere; }
+    .module-item.done .module-item-title { text-decoration: line-through; color: var(--muted); }
+    .module-item input[type="checkbox"] { accent-color: var(--blue); margin-top: 3px; }
+    .module-actions { display: flex; gap: 7px; }
+    .module-actions button { padding: 6px 9px; }
+    .module-empty { padding: 25px 18px; border: 1px dashed var(--line); color: var(--muted); font-size: 12px; text-align: center; }
+    .module-notice { color: var(--muted); font-size: 11px; line-height: 1.6; margin-top: 12px; }
+    .chat-log { display: grid; gap: 12px; margin: 20px 0; }
+    .chat-message { max-width: 90%; padding: 13px 15px; border: 1px solid var(--line); background: #171e22; font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-message.user { justify-self: end; border-color: #405763; background: #1c2a31; }
+    .chat-message.system { max-width: 100%; color: #c2a7a7; }
+    .chat-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+    .ai-status-panel { margin-bottom: 18px; }
+    .ai-progress { display: block; width: 100%; height: 8px; margin: 12px 0; accent-color: var(--blue); }
+    .ai-status-panel .module-button { margin-top: 8px; }
+    .module-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    @media (max-width: 560px) {
+      .module-form { grid-template-columns: 1fr; }
+      .module-form .module-button { width: 100%; }
+      .chat-form { grid-template-columns: 1fr; }
+      .module-toolbar { align-items: flex-start; flex-direction: column; }
+    }
+  `;
+  document.head.append(style);
+}
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function createModuleShell(title, description) {
+  const shell = element("section", "module-screen");
+  shell.append(element("div", "eyebrow", "PERSONAL ASSISTANT SYSTEM"));
+  shell.append(element("h1", "module-heading", title));
+  shell.append(element("p", "module-description", description));
+  return shell;
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function renderList(type) {
+  const config = listConfig[type];
+  const shell = createModuleShell(config.title, config.description);
+  const form = element("form", "module-form");
+  const title = element("input", "module-input");
+  title.name = "title";
+  title.placeholder = type === "reminders" ? "Текст напоминания" : "Название";
+  title.maxLength = 500;
+  title.required = true;
+  title.setAttribute("aria-label", title.placeholder);
+
+  const note = element("textarea", "module-textarea");
+  note.name = "note";
+  note.placeholder = "Заметка (необязательно)";
+  note.maxLength = 2000;
+  note.setAttribute("aria-label", "Заметка");
+
+  let dueInput;
+  let repeatSelect;
+  if (type === "reminders") {
+    dueInput = element("input", "module-input");
+    dueInput.type = "datetime-local";
+    dueInput.name = "dueAt";
+    dueInput.required = true;
+    dueInput.setAttribute("aria-label", "Дата и время напоминания");
+
+    repeatSelect = element("select", "module-select");
+    repeatSelect.name = "repeat";
+    repeatSelect.setAttribute("aria-label", "Повторение");
+    for (const [value, label] of [
+      ["none", "Без повтора"],
+      ["daily", "Каждый день"],
+      ["weekly", "Каждую неделю"],
+      ["monthly", "Каждый месяц"]
+    ]) {
+      const option = element("option", "", label);
+      option.value = value;
+      repeatSelect.append(option);
+    }
+  }
+
+  const submit = element("button", "module-button", "Добавить");
+  submit.type = "submit";
+  form.append(title, submit, note);
+  if (type === "reminders") form.append(dueInput, repeatSelect);
+  shell.append(form);
+
+  const toolbar = element("div", "module-toolbar");
+  toolbar.append(element("div", "panel-title", "СОХРАНЁННЫЕ ЭЛЕМЕНТЫ"));
+  const count = element("div", "module-item-meta", "");
+  toolbar.append(count);
+  shell.append(toolbar);
+
+  const list = element("div", "module-items");
+  shell.append(list);
+  const pushNotice = type === "reminders" ? element("p", "module-notice", "Проверка синхронизации push-напоминаний...") : null;
+  if (pushNotice) shell.append(pushNotice);
+
+  function refresh() {
+    const items = getItems(type);
+    count.textContent = String(items.length);
+    list.replaceChildren();
+
+    if (!items.length) {
+      list.append(element("div", "module-empty", "Здесь пока ничего нет."));
+      return;
+    }
+
+    for (const item of items) {
+      const row = element("article", `module-item${item.completed ? " done" : ""}`);
+      const checkbox = element("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = type === "reminders" ? !item.enabled : item.completed;
+      checkbox.setAttribute("aria-label", type === "reminders" ? "Отключить напоминание" : "Отметить выполненным");
+      checkbox.addEventListener("change", () => {
+        if (type === "reminders") {
+          const updated = updateItem(type, item.id, { enabled: !checkbox.checked });
+          if (updated?.enabled) {
+            savePushReminder(updated).then(() => { pushNotice.textContent = "Напоминание синхронизировано с сервером."; })
+              .catch(error => { pushNotice.textContent = `Сохранено локально. Push не синхронизирован: ${error.message}`; });
+          } else {
+            deletePushReminder(item.id).then(() => {
+              if (pushNotice) pushNotice.textContent = "Напоминание выключено локально и на сервере.";
+            }).catch(error => {
+              if (pushNotice) pushNotice.textContent = `Локально выключено, но сервер не получил удаление: ${error.message}`;
+            });
+          }
+        } else updateItem(type, item.id, { completed: checkbox.checked });
+        refresh();
+      });
+
+      const main = element("div", "module-item-main");
+      main.append(element("div", "module-item-title", item.title));
+      if (item.note) main.append(element("div", "module-item-note", item.note));
+
+      if (type === "reminders") {
+        const repeatLabel = {
+          none: "Без повтора",
+          daily: "Каждый день",
+          weekly: "Каждую неделю",
+          monthly: "Каждый месяц"
+        }[item.repeat?.frequency || "none"];
+        main.append(element("div", "module-item-meta", `${formatDate(item.dueAt)} · ${repeatLabel}${item.enabled ? "" : " · выключено"}`));
+      } else {
+        main.append(element("div", "module-item-meta", `Добавлено: ${formatDate(item.createdAt)}`));
+      }
+
+      const actions = element("div", "module-actions");
+      const edit = element("button", "module-button", "Изменить");
+      edit.type = "button";
+      edit.addEventListener("click", () => {
+        const nextTitle = window.prompt("Новое название:", item.title);
+        if (nextTitle === null) return;
+        const nextNote = window.prompt("Заметка:", item.note || "");
+        if (nextNote === null) return;
+        const changes = { title: nextTitle, note: nextNote };
+        if (type === "reminders") {
+          const currentDate = new Date(item.dueAt);
+          const localDate = new Date(currentDate.getTime() - currentDate.getTimezoneOffset() * 60_000)
+            .toISOString().slice(0, 16);
+          const nextDueAt = window.prompt("Дата и время (ГГГГ-ММ-ДД ЧЧ:ММ):", localDate);
+          if (nextDueAt === null) return;
+          const nextRepeat = window.prompt(
+            "Повтор: none, daily, weekly или monthly",
+            item.repeat?.frequency || "none"
+          );
+          if (nextRepeat === null) return;
+          if (!["none", "daily", "weekly", "monthly"].includes(nextRepeat)) {
+            window.alert("Неизвестный тип повтора.");
+            return;
+          }
+          const parsedDate = new Date(nextDueAt);
+          if (Number.isNaN(parsedDate.getTime())) {
+            window.alert("Не удалось распознать дату и время.");
+            return;
+          }
+          changes.dueAt = parsedDate.toISOString();
+          changes.repeat = { frequency: nextRepeat, interval: item.repeat?.interval || 1 };
+        }
+        try {
+          const updated = updateItem(type, item.id, changes);
+          if (type === "reminders" && updated?.enabled) {
+            savePushReminder(updated).then(() => { pushNotice.textContent = "Изменения напоминания синхронизированы."; })
+              .catch(error => { pushNotice.textContent = `Изменено локально. Push не синхронизирован: ${error.message}`; });
+          }
+          refresh();
+        } catch (error) {
+          window.alert(error.message || "Не удалось изменить элемент.");
+        }
+      });
+      const remove = element("button", "module-button danger", "Удалить");
+      remove.type = "button";
+      remove.addEventListener("click", () => {
+        if (deleteItem(type, item.id)) {
+          if (type === "reminders") {
+            deletePushReminder(item.id).then(() => {
+              if (pushNotice) pushNotice.textContent = "Напоминание удалено с устройства и сервера.";
+            }).catch(error => {
+              if (pushNotice) pushNotice.textContent = `Удалено локально, но сервер не получил удаление: ${error.message}`;
+            });
+          }
+          refresh();
+        }
+      });
+      actions.append(edit, remove);
+      row.append(checkbox, main, actions);
+      list.append(row);
+    }
+  }
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    try {
+      const input = {
+        title: title.value,
+        note: note.value
+      };
+      if (type === "reminders") {
+        input.dueAt = new Date(dueInput.value).toISOString();
+        input.repeat = { frequency: repeatSelect.value, interval: 1 };
+      }
+      const created = addItem(type, input);
+      if (type === "reminders") {
+        savePushReminder(created).then(() => {
+          pushNotice.textContent = "Напоминание сохранено на сервере. Push-доставка включена для подписанных устройств.";
+        }).catch(error => {
+          pushNotice.textContent = `Напоминание сохранено локально. Серверная доставка пока недоступна: ${error.message}`;
+        });
+      }
+      form.reset();
+      refresh();
+      title.focus();
+    } catch (error) {
+      window.alert(error.message || "Не удалось сохранить элемент.");
+    }
+  });
+
+  shell.append(element("p", "module-notice",
+    type === "reminders"
+      ? "Если сервер или токен не настроен, напоминание останется только в локальном списке. Для фоновой доставки нужны Web Push, подписка устройства и настроенный сервер."
+      : "Данные сохраняются в браузере на этом устройстве и пока не синхронизируются с другими устройствами."
+  ));
+  refresh();
+  if (type === "reminders") {
+    listPushReminders().then(async result => {
+      const remoteById = new Map((result.reminders || []).map(item => [item.id, item]));
+      const local = getItems("reminders").filter(item => item.enabled);
+      for (const item of local) {
+        const remote = remoteById.get(item.id);
+        if (!remote) {
+          await savePushReminder(item);
+        } else if (Date.parse(item.updatedAt) > Date.parse(remote.updatedAt)) {
+          await savePushReminder(item);
+        } else if (remote.dueAt !== item.dueAt) {
+          updateItem("reminders", item.id, { dueAt: remote.dueAt });
+        }
+      }
+      pushNotice.textContent = "Серверные напоминания синхронизированы.";
+    }).catch(error => {
+      pushNotice.textContent = `Локальный список работает. Серверная синхронизация недоступна: ${error.message}`;
+    });
+  }
+  return shell;
+}
+
+function runLocalCommand(message) {
+  const text = message.trim();
+  const normalized = text.toLocaleLowerCase("ru-RU");
+  const aliases = [
+    { type: "tasks", names: ["хочу сделать", "задачи", "список задач"] },
+    { type: "watchlist", names: ["хочу посмотреть", "посмотреть", "фильмы", "сериалы"] },
+    { type: "wishlist", names: ["мои хотелки", "хотелки", "покупки"] },
+    { type: "reminders", names: ["напоминания", "напомни", "напоминание"] }
+  ];
+  const target = aliases.find((entry) => entry.names.some((name) => normalized.includes(name)));
+  const addDestinationFirst = text.match(/^(?:добавь|запиши|сохрани)\s+(?:мне\s+)?(?:в\s+)?(.+?)\s*[:,-]\s*(.+)$/i);
+  const addItemFirst = text.match(/^(?:добавь|запиши|сохрани)\s+(.+?)\s+в\s+(.+)$/i);
+  const addToList = addDestinationFirst || addItemFirst;
+  if (addToList) {
+    const destination = (addDestinationFirst ? addToList[1] : addToList[2]).toLocaleLowerCase("ru-RU");
+    const title = addDestinationFirst ? addToList[2] : addToList[1];
+    const type = aliases.find((entry) => entry.names.some((name) => destination.includes(name)))?.type;
+    if (type && title.trim()) {
+      const item = addItem(type, { title: title.trim() });
+      return "Сохранено в список «" + listConfig[type].title + "»: " + item.title + ".";
+    }
+  }
+  const showIntent = /^(?:покажи|что у меня|что записано|открой|список)\b/i.test(text);
+  if (showIntent && target) {
+    const items = getItems(target.type);
+    if (!items.length) return "В списке «" + listConfig[target.type].title + "» пока пусто.";
+    return "В списке «" + listConfig[target.type].title + "» " + items.length + " записей:\n" +
+      items.slice(0, 15).map((item, index) =>
+        (index + 1) + ". " + item.title + (item.completed ? " (выполнено)" : "")
+      ).join("\n");
+  }
+  const doneMatch = text.match(/^(?:отметь|закрой|выполни)\s+(.+?)\s+(?:как\s+)?(?:выполненным|выполненной|готово)$/i);
+  if (doneMatch) {
+    const needle = doneMatch[1].toLocaleLowerCase("ru-RU");
+    for (const entry of aliases.filter((item) => item.type !== "reminders")) {
+      const item = getItems(entry.type).find((candidate) => candidate.title.toLocaleLowerCase("ru-RU").includes(needle));
+      if (item) { updateItem(entry.type, item.id, { completed: true }); return "Готово. «" + item.title + "» отмечено как выполненное." }
+    }
+    return "Не нашла запись «" + doneMatch[1] + "» в ваших списках.";
+  }
+  return null;
+}
+
+function speakText(text) {
+  if (!("speechSynthesis" in window)) return false;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "ru-RU";
+  utterance.rate = 1;
+  window.speechSynthesis.speak(utterance);
+  return true;
+}
+function renderChat() {
+  const shell = createModuleShell(
+    "Диалог",
+    "Локальный ИИ работает на графическом процессоре iPad. Для первого запуска потребуется интернет и загрузка модели; затем модель хранится в кэше браузера."
+  );
+  const storageKey = "jarvis-2-chat-v1";
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+  } catch {
+    saved = null;
+  }
+  const conversationId = typeof saved?.conversationId === "string"
+    ? saved.conversationId
+    : globalThis.crypto?.randomUUID?.() || `conversation-${Date.now()}`;
+  let history = Array.isArray(saved?.history)
+    ? saved.history.filter((item) =>
+        item && ["user", "assistant"].includes(item.role)
+        && typeof item.content === "string" && item.content.trim()
+      ).slice(-30)
+    : [];
+
+  const statusPanel = element("section", "panel ai-status-panel");
+  statusPanel.append(element("div", "panel-title", "ЛОКАЛЬНЫЙ ИИ / WEBGPU"));
+  const statusText = element("p", "module-notice", "Проверка поддержки WebGPU…");
+  const progress = element("progress", "ai-progress");
+  progress.max = 1;
+  progress.value = 0;
+  const loadButton = element("button", "module-button", "Загрузить локальный ИИ");
+  loadButton.type = "button";
+  const modelNote = element("p", "module-notice",
+    "Модель Qwen 2.5 0.5B, квантование 4-bit. Первая загрузка займёт время и потребует несколько сотен мегабайт свободного места. Генерация выполняется на устройстве."
+  );
+  statusPanel.append(statusText, progress, loadButton, modelNote);
+  shell.append(statusPanel);
+
+  const log = element("div", "chat-log");
+  if (!history.length) {
+    log.append(element("div", "chat-message system",
+      "JARVIS готов к локальному запуску. Нажмите «Загрузить локальный ИИ» или отправьте сообщение. При первом запуске модель будет загружена в кэш."
+    ));
+  } else {
+    for (const item of history) {
+      log.append(element(
+        "div",
+        `chat-message${item.role === "user" ? " user" : ""}`,
+        item.content
+      ));
+    }
+  }
+
+  function updateStatus() {
+    const state = getLocalAIStatus();
+    if (!state.supported) {
+      statusText.textContent = "WebGPU недоступен. Нужен актуальный Safari на iPadOS 26 или новее.";
+      loadButton.disabled = true;
+      return;
+    }
+    if (state.loaded) {
+      statusText.textContent = "Локальный ИИ запущен и готов отвечать.";
+      loadButton.textContent = "ИИ запущен";
+      loadButton.disabled = true;
+      progress.value = 1;
+      return;
+    }
+    statusText.textContent = state.loading
+      ? "Загрузка модели…"
+      : "Графический процессор доступен. Локальная модель ещё не загружена.";
+  }
+
+  async function loadAI() {
+    loadButton.disabled = true;
+    loadButton.textContent = "Запуск…";
+    statusText.textContent = "Подготовка локального ИИ…";
+    try {
+      await initializeLocalAI(({ progress: value, text }) => {
+        progress.value = value;
+        statusText.textContent = text;
+      });
+      statusText.textContent = "Локальный ИИ запущен и готов отвечать.";
+      loadButton.textContent = "ИИ запущен";
+      progress.value = 1;
+    } catch (error) {
+      statusText.textContent = error.message;
+      loadButton.disabled = false;
+      loadButton.textContent = "Повторить запуск";
+    }
+  }
+
+  loadButton.addEventListener("click", loadAI);
+  updateStatus();
+
+  const form = element("form", "chat-form");
+  const input = element("textarea", "module-textarea");
+  input.placeholder = "Напишите сообщение JARVIS…";
+  input.rows = 2;
+  input.required = true;
+  input.setAttribute("aria-label", "Сообщение ассистенту");
+  const controls = element("div", "module-toolbar");
+  const voice = element("button", "module-button", "Говорить");
+  voice.type = "button";
+  voice.setAttribute("aria-label", "Надиктовать сообщение");
+  const send = element("button", "module-button", "Отправить");
+  send.type = "submit";
+  controls.append(voice, send);
+  form.append(input, controls);
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    voice.disabled = true;
+    voice.title = "Распознавание речи не поддерживается этим браузером";
+  } else {
+    voice.addEventListener("click", () => {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "ru-RU";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      voice.disabled = true;
+      voice.textContent = "Слушаю…";
+      recognition.onresult = (event) => {
+        input.value = event.results?.[0]?.[0]?.transcript || "";
+        input.focus();
+      };
+      recognition.onerror = () => {
+        log.append(element("div", "chat-message system",
+          "Не удалось распознать речь. Проверьте разрешение микрофона или введите сообщение текстом."
+        ));
+      };
+      recognition.onend = () => {
+        voice.disabled = false;
+        voice.textContent = "Говорить";
+      };
+      try {
+        recognition.start();
+      } catch (error) {
+        voice.disabled = false;
+        voice.textContent = "Говорить";
+        log.append(element("div", "chat-message system", error.message));
+      }
+    });
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = input.value.trim();
+    if (!message) return;
+    log.append(element("div", "chat-message user", message));
+    input.value = "";
+    send.disabled = true;
+    send.textContent = "Думаю…";
+    try {
+      const localAnswer = runLocalCommand(message);
+      const answer = localAnswer || await generateLocalReply(history, message);
+      const responseRow = element("div", "chat-message", answer);
+      const speak = element("button", "module-button", "Озвучить");
+      speak.type = "button";
+      speak.addEventListener("click", () => {
+        if (!speakText(answer)) {
+          log.append(element("div", "chat-message system",
+            "Озвучивание не поддерживается этим браузером."
+          ));
+        }
+      });
+      responseRow.append(document.createTextNode(" "), speak);
+      log.append(responseRow);
+      history = [
+        ...history,
+        { role: "user", content: message },
+        { role: "assistant", content: answer }
+      ].slice(-30);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ conversationId, history }));
+      } catch {
+        log.append(element("div", "chat-message system",
+          "Не удалось сохранить историю локально. Текущий диалог остаётся на экране."
+        ));
+      }
+    } catch (error) {
+      log.append(element("div", "chat-message system", error.message));
+      statusText.textContent = error.message;
+    } finally {
+      send.disabled = false;
+      send.textContent = "Отправить";
+      log.scrollTop = log.scrollHeight;
+      updateStatus();
+    }
+  });
+
+  shell.append(log, form);
+  return shell;
+}
+
+function renderSettings() {
+  const shell = createModuleShell("Настройки", "Локальные данные JARVIS 2 и резервное копирование.");
+  const panel = element("section", "panel");
+  panel.append(element("div", "panel-title", "РЕЗЕРВНАЯ КОПИЯ"));
+
+  const description = element("p", "module-description",
+    "Экспорт сохранит все четыре списка в JSON-файл. Импорт заменит текущие локальные списки данными из выбранной копии."
+  );
+  panel.append(description);
+
+  const toolbar = element("div", "module-toolbar");
+  const exportButton = element("button", "module-button", "Экспортировать данные");
+  exportButton.type = "button";
+  exportButton.addEventListener("click", () => {
+    try {
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        lists: {
+          tasks: getItems("tasks"),
+          watchlist: getItems("watchlist"),
+          wishlist: getItems("wishlist"),
+          reminders: getItems("reminders")
+        }
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = element("a");
+      anchor.href = url;
+      anchor.download = `jarvis-2-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      window.alert(error.message || "Не удалось создать резервную копию.");
+    }
+  });
+
+  const importLabel = element("label", "module-button", "Импортировать копию");
+  importLabel.style.display = "inline-flex";
+  importLabel.style.alignItems = "center";
+  importLabel.style.cursor = "pointer";
+  const fileInput = element("input");
+  fileInput.type = "file";
+  fileInput.accept = "application/json,.json";
+  fileInput.hidden = true;
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!window.confirm("Импорт заменит все текущие локальные списки. Продолжить?")) {
+        fileInput.value = "";
+        return;
+      }
+      const { importAllLists } = await import("../features/lists/list-store.js");
+      importAllLists(parsed);
+      window.alert("Резервная копия восстановлена.");
+    } catch (error) {
+      window.alert(error.message || "Не удалось прочитать резервную копию.");
+    } finally {
+      fileInput.value = "";
+    }
+  });
+  importLabel.append(fileInput);
+  toolbar.append(exportButton, importLabel);
+  panel.append(toolbar);
+  panel.append(element("p", "module-notice",
+    "Файл резервной копии содержит ваши личные записи. Храните его в безопасном месте и не публикуйте."
+  ));
+  shell.append(panel);
+
+  const apiPanel = element("section", "panel");
+  apiPanel.style.marginTop = "14px";
+  apiPanel.append(element("div", "panel-title", "СОЕДИНЕНИЕ С ИИ-СЕРВЕРОМ"));
+  apiPanel.append(element("p", "module-description",
+    "Укажите адрес развёрнутого JARVIS API. Ключ модели хранится только на сервере. Здесь указывается адрес сервера, а не ключ OpenRouter."
+  ));
+  const apiUrlInput = element("input", "module-input");
+  apiUrlInput.type = "url";
+  apiUrlInput.autocomplete = "url";
+  apiUrlInput.placeholder = "https://ваш-сервер.onrender.com";
+  apiUrlInput.value = localStorage.getItem("jarvis-2-api-base-url") || "";
+  apiUrlInput.setAttribute("aria-label", "Адрес API сервера JARVIS");
+  const apiActions = element("div", "module-toolbar");
+  const saveApiUrl = element("button", "module-button", "Сохранить адрес");
+  saveApiUrl.type = "button";
+  const testApi = element("button", "module-button", "Проверить ИИ");
+  testApi.type = "button";
+  const apiStatus = element("p", "module-notice", "Сервер пока не проверен.");
+  saveApiUrl.addEventListener("click", () => {
+    const value = apiUrlInput.value.trim();
+    if (!value) {
+      localStorage.removeItem("jarvis-2-api-base-url");
+      apiStatus.textContent = "Используется адрес API текущего сайта.";
+      return;
+    }
+    try {
+      const parsed = new URL(value);
+      if (!["https:", "http:"].includes(parsed.protocol) || parsed.pathname !== "/" || parsed.search || parsed.hash) {
+        throw new Error("Укажите только базовый HTTPS-адрес сервера, без путей.");
+      }
+      if (parsed.protocol !== "https:" && parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        throw new Error("Для удалённого сервера требуется HTTPS.");
+      }
+      localStorage.setItem("jarvis-2-api-base-url", parsed.origin);
+      apiUrlInput.value = parsed.origin;
+      apiStatus.textContent = "Адрес сохранён. Теперь проверьте соединение.";
+    } catch (error) {
+      apiStatus.textContent = error.message || "Некорректный адрес сервера.";
+    }
+  });
+  testApi.addEventListener("click", async () => {
+    testApi.disabled = true;
+    testApi.textContent = "Проверка...";
+    try {
+      const health = await checkServer();
+      apiStatus.textContent = health.aiConfigured
+        ? "Соединение установлено. Сервер подтверждает, что ИИ настроен."
+        : "Сервер доступен, но ключ ИИ или настройки модели ещё не заданы.";
+    } catch (error) {
+      apiStatus.textContent = error.message || "Не удалось связаться с сервером.";
+    } finally {
+      testApi.disabled = false;
+      testApi.textContent = "Проверить ИИ";
+    }
+  });
+  apiActions.append(saveApiUrl, testApi);
+  apiPanel.append(apiUrlInput, apiActions, apiStatus);
+  shell.append(apiPanel);
+
+  const accessPanel = element("section", "panel");
+  accessPanel.style.marginTop = "14px";
+  accessPanel.append(element("div", "panel-title", "ДОСТУП К СЕРВЕРУ"));
+  accessPanel.append(element("p", "module-description",
+    "Токен нужен только если серверный администратор включил API_ACCESS_TOKEN. В этой вкладке он хранится временно и исчезнет после закрытия вкладки."
+  ));
+  const tokenInput = element("input", "module-input");
+  tokenInput.type = "password";
+  tokenInput.autocomplete = "off";
+  tokenInput.placeholder = "Bearer-токен сервера";
+  tokenInput.value = sessionStorage.getItem("jarvis-2-api-access-token") || "";
+  tokenInput.setAttribute("aria-label", "Токен доступа к серверу");
+  const tokenActions = element("div", "module-toolbar");
+  const saveToken = element("button", "module-button", "Сохранить на эту сессию");
+  saveToken.type = "button";
+  saveToken.addEventListener("click", () => {
+    const value = tokenInput.value.trim();
+    if (value) sessionStorage.setItem("jarvis-2-api-access-token", value);
+    else sessionStorage.removeItem("jarvis-2-api-access-token");
+    window.alert(value ? "Токен сохранён только до закрытия вкладки." : "Токен удалён из этой сессии.");
+  });
+  const clearToken = element("button", "module-button danger", "Очистить");
+  clearToken.type = "button";
+  clearToken.addEventListener("click", () => {
+    tokenInput.value = "";
+    sessionStorage.removeItem("jarvis-2-api-access-token");
+  });
+  tokenActions.append(saveToken, clearToken);
+  accessPanel.append(tokenInput, tokenActions);
+  shell.append(accessPanel);
+
+  const status = element("section", "panel");
+  status.style.marginTop = "14px";
+  status.append(element("div", "panel-title", "СОСТОЯНИЕ СИСТЕМЫ"));
+  status.append(element("div", "system-row", "Локальное хранилище: активно"));
+  status.append(element("div", "system-row", "Синхронизация между устройствами: не подключена"));
+  status.append(element("div", "system-row", "ИИ и голос: не подключены"));
+  shell.append(status);
+  return shell;
+}
+
+function renderPlaceholder(view) {
+  if (view === "settings") return renderSettings();
+  const shell = createModuleShell("Файлы", "Локальная библиотека документов и вложений.");
+  import("../features/files/files.js")
+    .then(({ renderFiles }) => renderFiles(shell))
+    .catch((error) => {
+      shell.append(element("div", "module-empty", error.message || "Не удалось открыть библиотеку файлов."));
+    });
+  return shell;
+}
+
+function navigate(view) {
+  if (!dashboard || !views[view]) return;
+  navButtons.forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+
+  if (view === "home") {
+    dashboard.innerHTML = homeMarkup;
+  } else {
+    dashboard.replaceChildren(
+      view === "chat"
+        ? renderChat()
+        : view === "communications"
+          ? renderCommunications()
+          : listConfig[view]
+          ? renderList(view)
+          : renderPlaceholder(view)
+    );
+  }
+
+  document.title = `${views[view]} | JARVIS 2`;
+  if (window.innerWidth <= 900) {
+    document.getElementById("app")?.classList.add("sidebar-hidden");
+  }
+}
+
+function initialize() {
+  if (!dashboard) return;
+  addStyles();
+  const sidebar = document.querySelector(".sidebar");
+  const systemLabel = [...(sidebar?.querySelectorAll(".nav-label") || [])].at(-1);
+  if (sidebar && systemLabel && !document.querySelector('[data-view="communications"]')) {
+    const communicationsButton = element("button", "nav-item");
+    communicationsButton.type = "button";
+    communicationsButton.dataset.view = "communications";
+    communicationsButton.append(
+      element("span", "nav-icon", "◉"),
+      document.createTextNode(" Связь и уведомления")
+    );
+    sidebar.insertBefore(communicationsButton, systemLabel);
+    navButtons.push(communicationsButton);
+  }
+
+  navButtons.forEach((button) => {
+    button.addEventListener("click", () => navigate(button.dataset.view));
+  });
+  navButtons.forEach((button) => {
+    button.setAttribute("type", "button");
+  });
+  navigate("home");
+}
+
+initialize();

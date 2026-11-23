@@ -1,0 +1,208 @@
+import AVFoundation
+import SwiftUI
+import JarvisCore
+
+struct JarvisConversationView: View {
+    @AppStorage("jarvis2.currentConversationID") private var conversationIDString = ""
+    @State private var history: [JarvisConversationMessage] = []
+    @State private var draft = ""
+    @State private var statusMessage: String?
+    @State private var isSending = false
+    @State private var showDeleteConfirmation = false
+    @State private var synthesizer = AVSpeechSynthesizer()
+    @AppStorage("jarvis2.voice.ru.identifier") private var selectedRussianVoiceIdentifier = ""
+    @AppStorage("jarvis2.voice.uk.identifier") private var selectedUkrainianVoiceIdentifier = ""
+    private let conversationStore = JarvisConversationStore()
+
+    private var service: JarvisConversationService {
+        JarvisConversationService(store: conversationStore, engine: JarvisMLXAIEngine())
+    }
+
+    private var conversationID: UUID {
+        UUID(uuidString: conversationIDString) ?? UUID()
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(history) { message in
+                            HStack {
+                                if message.role == .user { Spacer(minLength: 30) }
+                                Text(message.text)
+                                    .padding(12)
+                                    .background(message.role == .user ? Color.blue.opacity(0.16) : Color.secondary.opacity(0.12))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                if message.role != .user { Spacer(minLength: 30) }
+                            }
+                            .id(message.id)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .onChange(of: history.count) { _ in
+                    if let last = history.last { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+            }
+
+            if let statusMessage {
+                Text(statusMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+            }
+
+            HStack(spacing: 8) {
+                TextField("Сообщение JARVIS", text: $draft, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...4)
+                Button(action: send) {
+                    Image(systemName: "arrow.up.circle.fill").font(.title2)
+                }
+                .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel("Отправить сообщение")
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+        }
+        .navigationTitle("Диалог")
+        .task {
+            if conversationIDString.isEmpty {
+                conversationIDString = UUID().uuidString
+            }
+            await reload()
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    synthesizer.stopSpeaking(at: .immediate)
+                    statusMessage = "Озвучивание остановлено."
+                } label: {
+                    Image(systemName: "stop.circle")
+                }
+                .accessibilityLabel("Остановить озвучивание")
+
+                Button("Новый") {
+                    synthesizer.stopSpeaking(at: .immediate)
+                    conversationIDString = UUID().uuidString
+                    history = []
+                    statusMessage = nil
+                }
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .accessibilityLabel("Удалить текущую беседу")
+            }
+        }
+        .onDisappear {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        .confirmationDialog("Удалить текущую беседу?", isPresented: $showDeleteConfirmation,
+                            titleVisibility: .visible) {
+            Button("Удалить беседу", role: .destructive) { deleteCurrentConversation() }
+            Button("Отмена", role: .cancel) {}
+        }
+    }
+
+    private func reload() async {
+        do {
+            history = try await service.history(conversationID: conversationID)
+        } catch {
+            statusMessage = "Не удалось загрузить историю диалога."
+        }
+    }
+
+    private func send() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        let activeConversationID = conversationID
+        draft = ""
+        isSending = true
+        statusMessage = "JARVIS готовит ответ на iPad…"
+        Task {
+            do {
+                let result = try await service.send(text, conversationID: activeConversationID)
+                await reload()
+                switch result {
+                case .reply(let replyText):
+                    statusMessage = nil
+                    speak(replyText)
+                case .engineUnavailable:
+                    statusMessage = "Локальный ИИ не подключён."
+                }
+            } catch {
+                await reload()
+                statusMessage = "Ошибка локального ИИ: \(error.localizedDescription)"
+            }
+            isSending = false
+        }
+    }
+
+    private func speak(_ text: String) {
+        let isUkrainian = containsUkrainianSignal(text)
+        let selectedIdentifier = isUkrainian ? selectedUkrainianVoiceIdentifier : selectedRussianVoiceIdentifier
+        let preferredVoice: AVSpeechSynthesisVoice? = {
+            if !selectedIdentifier.isEmpty,
+               let selected = AVSpeechSynthesisVoice(identifier: selectedIdentifier) {
+                return selected
+            }
+            let available = AVSpeechSynthesisVoice.speechVoices()
+            if isUkrainian {
+                let lesya = available.filter {
+                    $0.language.hasPrefix("uk") &&
+                    ($0.name.localizedCaseInsensitiveContains("Леся") ||
+                     $0.name.localizedCaseInsensitiveContains("Lesya"))
+                }
+                return lesya.first(where: { $0.quality == .enhanced || $0.quality == .premium })
+                    ?? lesya.first
+            }
+            return available.first(where: {
+                $0.language.hasPrefix("ru") &&
+                ($0.name.localizedCaseInsensitiveContains("Голос 1") ||
+                 $0.name.localizedCaseInsensitiveContains("Siri Voice 1"))
+            })
+        }()
+        guard let voice = preferredVoice else {
+            statusMessage = isUkrainian
+                ? "Ответ готов, но украинский голос не выбран или не установлен."
+                : "Ответ готов, но русский голос не выбран или не установлен."
+            return
+        }
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = voice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        synthesizer.speak(utterance)
+    }
+
+    private func containsUkrainianSignal(_ text: String) -> Bool {
+        if text.range(of: "[іїєґІЇЄҐ]", options: .regularExpression) != nil {
+            return true
+        }
+        let markers = [
+            "дякую", "будь ласка", "сьогодні", "зараз", "щодня",
+            "можу", "можна", "потрібно", "зробити", "гаразд",
+            "звісно", "відповідь", "підтримує", "зателефонувати",
+            "лікарю", "українською", "допомогти"
+        ]
+        return markers.contains { text.localizedCaseInsensitiveContains($0) }
+    }
+
+    private func deleteCurrentConversation() {
+        let activeConversationID = conversationID
+        Task {
+            do {
+                try await service.deleteConversation(id: activeConversationID)
+                history = []
+                conversationIDString = UUID().uuidString
+                statusMessage = "Беседа удалена."
+            } catch {
+                statusMessage = "Не удалось удалить беседу."
+            }
+        }
+    }
+}
