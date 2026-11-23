@@ -70,6 +70,22 @@ struct JarvisHomeView: View {
                 }
                 .buttonStyle(.bordered)
 
+                NavigationLink {
+                    JarvisAISettingsView()
+                } label: {
+                    Label("Подключение ИИ", systemImage: "brain")
+                        .frame(maxWidth: .infinity).padding()
+                }
+                .buttonStyle(.bordered)
+
+                NavigationLink {
+                    JarvisVoiceSettingsView()
+                } label: {
+                    Label("Голос JARVIS", systemImage: "waveform")
+                        .frame(maxWidth: .infinity).padding()
+                }
+                .buttonStyle(.bordered)
+
                 Text("Локальные списки и память работают без сети. Полноценный офлайн-ИИ пока не подключён.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
