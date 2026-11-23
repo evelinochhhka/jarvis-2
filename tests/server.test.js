@@ -215,7 +215,7 @@ test("chat endpoint applies a per-client rate limit", async () => {
 
 test("chat requires a configured bearer token and rejects missing or incorrect tokens", async () => {
   const config = {
-    ...loadConfig({ AI_API_KEY: "test-key", API_ACCESS_TOKEN: "a-long-test-access-token" }),
+    ...loadConfig({ AI_API_KEY: "test-key", API_ACCESS_TOKEN: "jarvis-test-token-with-at-least-32-bytes-long" }),
     rateLimitMaxRequests: 10
   };
   let called = false;
@@ -239,7 +239,7 @@ test("chat requires a configured bearer token and rejects missing or incorrect t
 });
 
 test("chat accepts the configured bearer token", async () => {
-  const token = "a-long-test-access-token";
+  const token = "jarvis-test-token-with-at-least-32-bytes-long";
   const config = {
     ...loadConfig({ AI_API_KEY: "test-key", API_ACCESS_TOKEN: token }),
     rateLimitMaxRequests: 10
@@ -270,4 +270,12 @@ test("CORS preflight permits the Authorization header", async () => {
     assert.equal(response.status, 204);
     assert.match(response.headers.get("access-control-allow-headers"), /Authorization/i);
   });
+});
+
+
+test("server configuration rejects weak API access tokens", () => {
+  assert.throws(
+    () => loadConfig({ API_ACCESS_TOKEN: "too-short" }),
+    /не менее 32 байт/
+  );
 });
