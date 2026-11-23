@@ -10,7 +10,8 @@ struct JarvisConversationView: View {
     @State private var isSending = false
     @State private var showDeleteConfirmation = false
     @State private var synthesizer = AVSpeechSynthesizer()
-    @AppStorage("jarvis2.voice.identifier") private var selectedVoiceIdentifier = ""
+    @AppStorage("jarvis2.voice.ru.identifier") private var selectedRussianVoiceIdentifier = ""
+    @AppStorage("jarvis2.voice.uk.identifier") private var selectedUkrainianVoiceIdentifier = ""
     private let conversationStore = JarvisConversationStore()
 
     private var service: JarvisConversationService {
@@ -134,8 +135,10 @@ struct JarvisConversationView: View {
     }
 
     private func speak(_ text: String) {
-        guard !selectedVoiceIdentifier.isEmpty,
-              let voice = AVSpeechSynthesisVoice(identifier: selectedVoiceIdentifier) else {
+        let isUkrainian = text.range(of: "[іїєґІЇЄҐ]", options: .regularExpression) != nil
+        let identifier = isUkrainian ? selectedUkrainianVoiceIdentifier : selectedRussianVoiceIdentifier
+        guard !identifier.isEmpty,
+              let voice = AVSpeechSynthesisVoice(identifier: identifier) else {
             return
         }
         synthesizer.stopSpeaking(at: .immediate)
