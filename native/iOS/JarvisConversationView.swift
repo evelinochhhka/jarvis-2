@@ -16,7 +16,9 @@ struct JarvisConversationView: View {
 
     private var service: JarvisConversationService {
         let address = UserDefaults.standard.string(forKey: "jarvis2.api.baseURL") ?? ""
-        let engine = URL(string: address).flatMap { JarvisHTTPAIEngine(serverBaseURL: $0) }
+        let engine = URL(string: address).flatMap {
+            JarvisHTTPAIEngine(serverBaseURL: $0, accessToken: JarvisServerTokenStore.read())
+        }
         return JarvisConversationService(store: conversationStore, engine: engine)
     }
 
