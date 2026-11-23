@@ -19,7 +19,9 @@ private struct JarvisVoiceOption: Identifiable {
 }
 
 struct JarvisVoiceSettingsView: View {
-    @AppStorage("jarvis2.voice.identifier") private var selectedVoiceIdentifier = ""
+    @AppStorage("jarvis2.voice.ru.identifier") private var selectedRussianVoiceIdentifier = ""
+    @AppStorage("jarvis2.voice.uk.identifier") private var selectedUkrainianVoiceIdentifier = ""
+    @AppStorage("jarvis2.voice.identifier") private var legacyVoiceIdentifier = ""
     @State private var voices: [JarvisVoiceOption] = []
     @State private var synthesizer = AVSpeechSynthesizer()
     @State private var statusMessage = "Список будет получен непосредственно с этого устройства."
@@ -61,7 +63,10 @@ struct JarvisVoiceSettingsView: View {
             }
         }
         .navigationTitle("Голос JARVIS")
-        .onAppear(perform: loadVoices)
+        .onAppear {
+            migrateLegacyVoiceSelection()
+            loadVoices()
+        }
         .onDisappear {
             synthesizer.stopSpeaking(at: .immediate)
         }
@@ -86,15 +91,19 @@ struct JarvisVoiceSettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
-                            if selectedVoiceIdentifier == option.id {
+                            if selectedIdentifier(for: option) == option.id {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                             }
                         }
                         HStack {
                             Button("Выбрать") {
-                                selectedVoiceIdentifier = option.id
-                                statusMessage = "Выбран голос «\(option.voice.name)». Он будет использоваться для озвучивания ответов JARVIS."
+                                if option.voice.language.hasPrefix("uk") {
+                                    selectedUkrainianVoiceIdentifier = option.id
+                                } else {
+                                    selectedRussianVoiceIdentifier = option.id
+                                }
+                                statusMessage = "Выбран голос «\(option.voice.name)» для языка: \(option.languageTitle)."
                             }
                             .buttonStyle(.bordered)
                             Spacer()
@@ -110,6 +119,23 @@ struct JarvisVoiceSettingsView: View {
                 }
             }
         }
+    }
+
+    private func selectedIdentifier(for option: JarvisVoiceOption) -> String {
+        option.voice.language.hasPrefix("uk")
+            ? selectedUkrainianVoiceIdentifier
+            : selectedRussianVoiceIdentifier
+    }
+
+    private func migrateLegacyVoiceSelection() {
+        guard !legacyVoiceIdentifier.isEmpty,
+              let legacyVoice = AVSpeechSynthesisVoice(identifier: legacyVoiceIdentifier) else { return }
+        if legacyVoice.language.hasPrefix("uk"), selectedUkrainianVoiceIdentifier.isEmpty {
+            selectedUkrainianVoiceIdentifier = legacyVoiceIdentifier
+        } else if legacyVoice.language.hasPrefix("ru"), selectedRussianVoiceIdentifier.isEmpty {
+            selectedRussianVoiceIdentifier = legacyVoiceIdentifier
+        }
+        legacyVoiceIdentifier = ""
     }
 
     private func loadVoices() {
