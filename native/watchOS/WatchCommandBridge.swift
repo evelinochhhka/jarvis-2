@@ -109,7 +109,7 @@ final class WatchCommandBridge: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
 
-    func session(_ session: WCSession, didFinishUserInfoTransfer userInfoTransfer: WCSessionUserInfoTransfer,
+    func session(_ session: WCSession, didFinish userInfoTransfer: WCSessionUserInfoTransfer,
                  error: Error?) {
         DispatchQueue.main.async {
             self.status = error?.localizedDescription
