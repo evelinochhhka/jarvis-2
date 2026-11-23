@@ -11,7 +11,13 @@ struct JarvisConversationView: View {
     @State private var showDeleteConfirmation = false
     @State private var synthesizer = AVSpeechSynthesizer()
     @AppStorage("jarvis2.voice.identifier") private var selectedVoiceIdentifier = ""
-    private let service = JarvisConversationService()
+    private let conversationStore = JarvisConversationStore()
+
+    private var service: JarvisConversationService {
+        let address = UserDefaults.standard.string(forKey: "jarvis2.api.baseURL") ?? ""
+        let engine = URL(string: address).flatMap { JarvisHTTPAIEngine(serverBaseURL: $0) }
+        return JarvisConversationService(store: conversationStore, engine: engine)
+    }
 
     private var conversationID: UUID {
         UUID(uuidString: conversationIDString) ?? UUID()
