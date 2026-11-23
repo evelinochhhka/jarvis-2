@@ -81,7 +81,7 @@ struct JarvisHomeView: View {
                 NavigationLink {
                     JarvisAISettingsView()
                 } label: {
-                    Label("Подключение ИИ", systemImage: "brain")
+                    Label("Локальный ИИ", systemImage: "brain")
                         .frame(maxWidth: .infinity).padding()
                 }
                 .buttonStyle(.bordered)
@@ -94,7 +94,7 @@ struct JarvisHomeView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Text("Локальные списки, память и файлы работают без сети. Полноценный офлайн-ИИ пока не подключён.")
+                Text("Локальные списки, память и файлы работают без сети. Локальный ИИ Gemma 3 загружается в разделе «Локальный ИИ»; для первой загрузки нужен интернет.")
                     .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding()
