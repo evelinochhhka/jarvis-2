@@ -297,9 +297,18 @@ function renderList(type) {
   refresh();
   if (type === "reminders") {
     listPushReminders().then(async result => {
-      const remoteIds = new Set((result.reminders || []).map(item => item.id));
-      const local = getItems("reminders").filter(item => item.enabled && !remoteIds.has(item.id));
-      for (const item of local) await savePushReminder(item);
+      const remoteById = new Map((result.reminders || []).map(item => [item.id, item]));
+      const local = getItems("reminders").filter(item => item.enabled);
+      for (const item of local) {
+        const remote = remoteById.get(item.id);
+        if (!remote) {
+          await savePushReminder(item);
+        } else if (Date.parse(item.updatedAt) > Date.parse(remote.updatedAt)) {
+          await savePushReminder(item);
+        } else if (remote.dueAt !== item.dueAt) {
+          updateItem("reminders", item.id, { dueAt: remote.dueAt });
+        }
+      }
       pushNotice.textContent = "Серверные напоминания синхронизированы.";
     }).catch(error => {
       pushNotice.textContent = `Локальный список работает. Серверная синхронизация недоступна: ${error.message}`;
