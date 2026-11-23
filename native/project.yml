@@ -10,6 +10,15 @@ options:
 packages:
   JarvisCore:
     path: JarvisCore
+  MLXSwiftLM:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    from: "3.33.0"
+  SwiftHuggingFace:
+    url: https://github.com/huggingface/swift-huggingface
+    from: "0.9.0"
+  SwiftTransformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: "1.3.0"
 
 targets:
   JARVIS2:
@@ -22,6 +31,14 @@ targets:
     dependencies:
       - package: JarvisCore
         product: JarvisCore
+      - package: MLXSwiftLM
+        product: MLXLLM
+      - package: MLXSwiftLM
+        product: MLXHuggingFace
+      - package: SwiftHuggingFace
+        product: HuggingFace
+      - package: SwiftTransformers
+        product: Tokenizers
       - target: JARVIS2Watch
         embed: true
       - sdk: AppIntents.framework
