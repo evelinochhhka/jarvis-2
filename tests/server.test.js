@@ -479,3 +479,68 @@ test("push reminder scheduler advances recurring reminders in their local timezo
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("push reminder API lists, saves and removes reminders behind bearer auth", async () => {
+  const token = "jarvis-reminder-test-token-with-at-least-32-bytes";
+  const config = {
+    ...loadConfig({ API_ACCESS_TOKEN: token }),
+    isApiAuthEnabled: true
+  };
+  const stored = [];
+  const reminderScheduler = {
+    async list() { return [...stored]; },
+    async save(value) {
+      const reminder = { ...value, updatedAt: "2026-11-23T00:00:00.000Z" };
+      const index = stored.findIndex(item => item.id === value.id);
+      if (index >= 0) stored[index] = reminder;
+      else stored.push(reminder);
+      return reminder;
+    },
+    async remove(id) {
+      const before = stored.length;
+      for (let index = stored.length - 1; index >= 0; index -= 1) {
+        if (stored[index].id === id) stored.splice(index, 1);
+      }
+      return { removed: stored.length !== before };
+    }
+  };
+  await withServer({
+    config,
+    provider: {},
+    pushManager: { configured: true, publicKey: "public-key" },
+    reminderScheduler
+  }, async baseUrl => {
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    };
+    const payload = {
+      id: "reminder-api-1",
+      title: "Подготовить урок",
+      dueAt: "2026-11-24T14:00:00.000Z",
+      timeZone: "Europe/Kyiv",
+      repeat: { frequency: "weekly", interval: 1 }
+    };
+    const denied = await fetch(`${baseUrl}/api/v1/push/reminders`);
+    assert.equal(denied.status, 401);
+
+    const created = await fetch(`${baseUrl}/api/v1/push/reminders`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    assert.equal(created.status, 201);
+    assert.equal((await created.json()).reminder.id, payload.id);
+
+    const listed = await fetch(`${baseUrl}/api/v1/push/reminders`, { headers });
+    assert.equal((await listed.json()).reminders.length, 1);
+
+    const removed = await fetch(`${baseUrl}/api/v1/push/reminders/${payload.id}`, {
+      method: "DELETE",
+      headers
+    });
+    assert.equal(removed.status, 200);
+    assert.equal(stored.length, 0);
+  });
+});
