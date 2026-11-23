@@ -30,7 +30,7 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
-        run: xcodegen generate --spec native/project.yml --project native/JARVIS2.xcodeproj
+        run: xcodegen generate --spec native/project.yml --project native
       - name: Build iOS simulator app
         run: xcodebuild -project native/JARVIS2.xcodeproj -scheme JARVIS2 -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
       - name: Build watchOS simulator app
