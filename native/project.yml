@@ -2,9 +2,9 @@ name: JARVIS2
 options:
   bundleIdPrefix: com.jarvis2
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
     watchOS: "9.0"
-  xcodeVersion: "16.0"
+  xcodeVersion: "26.0"
   createIntermediateGroups: true
 
 packages:
