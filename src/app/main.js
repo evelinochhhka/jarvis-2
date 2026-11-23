@@ -427,6 +427,37 @@ function renderSettings() {
   ));
   shell.append(panel);
 
+  const accessPanel = element("section", "panel");
+  accessPanel.style.marginTop = "14px";
+  accessPanel.append(element("div", "panel-title", "ДОСТУП К СЕРВЕРУ"));
+  accessPanel.append(element("p", "module-description",
+    "Токен нужен только если серверный администратор включил API_ACCESS_TOKEN. В этой вкладке он хранится временно и исчезнет после закрытия вкладки."
+  ));
+  const tokenInput = element("input", "module-input");
+  tokenInput.type = "password";
+  tokenInput.autocomplete = "off";
+  tokenInput.placeholder = "Bearer-токен сервера";
+  tokenInput.value = sessionStorage.getItem("jarvis-2-api-access-token") || "";
+  tokenInput.setAttribute("aria-label", "Токен доступа к серверу");
+  const tokenActions = element("div", "module-toolbar");
+  const saveToken = element("button", "module-button", "Сохранить на эту сессию");
+  saveToken.type = "button";
+  saveToken.addEventListener("click", () => {
+    const value = tokenInput.value.trim();
+    if (value) sessionStorage.setItem("jarvis-2-api-access-token", value);
+    else sessionStorage.removeItem("jarvis-2-api-access-token");
+    window.alert(value ? "Токен сохранён только до закрытия вкладки." : "Токен удалён из этой сессии.");
+  });
+  const clearToken = element("button", "module-button danger", "Очистить");
+  clearToken.type = "button";
+  clearToken.addEventListener("click", () => {
+    tokenInput.value = "";
+    sessionStorage.removeItem("jarvis-2-api-access-token");
+  });
+  tokenActions.append(saveToken, clearToken);
+  accessPanel.append(tokenInput, tokenActions);
+  shell.append(accessPanel);
+
   const status = element("section", "panel");
   status.style.marginTop = "14px";
   status.append(element("div", "panel-title", "СОСТОЯНИЕ СИСТЕМЫ"));
