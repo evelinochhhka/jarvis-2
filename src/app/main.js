@@ -8,9 +8,13 @@ import {
   checkServer,
   deletePushReminder,
   listPushReminders,
-  savePushReminder,
-  sendChatMessage
+  savePushReminder
 } from "../services/api/client.js";
+import {
+  generateLocalReply,
+  getLocalAIStatus,
+  initializeLocalAI
+} from "../services/ai/local-engine.js";
 import { renderCommunications } from "../features/communications/communications.js";
 
 const dashboard = document.querySelector(".dashboard");
@@ -380,8 +384,10 @@ function speakText(text) {
   return true;
 }
 function renderChat() {
-  const shell = createModuleShell("Диалог", "История диалога сохраняется локально на этом устройстве. Ответы ИИ требуют настроенного сервера.");
-  const log = element("div", "chat-log");
+  const shell = createModuleShell(
+    "Диалог",
+    "Локальный ИИ работает на графическом процессоре iPad. Для первого запуска потребуется интернет и загрузка модели; затем модель хранится в кэше браузера."
+  );
   const storageKey = "jarvis-2-chat-v1";
   let saved = null;
   try {
@@ -399,9 +405,24 @@ function renderChat() {
       ).slice(-30)
     : [];
 
+  const statusPanel = element("section", "panel ai-status-panel");
+  statusPanel.append(element("div", "panel-title", "ЛОКАЛЬНЫЙ ИИ / WEBGPU"));
+  const statusText = element("p", "module-notice", "Проверка поддержки WebGPU…");
+  const progress = element("progress", "ai-progress");
+  progress.max = 1;
+  progress.value = 0;
+  const loadButton = element("button", "module-button", "Загрузить локальный ИИ");
+  loadButton.type = "button";
+  const modelNote = element("p", "module-notice",
+    "Модель Qwen 2.5 0.5B, квантование 4-bit. Первая загрузка займёт время и потребует несколько сотен мегабайт свободного места. Генерация выполняется на устройстве."
+  );
+  statusPanel.append(statusText, progress, loadButton, modelNote);
+  shell.append(statusPanel);
+
+  const log = element("div", "chat-log");
   if (!history.length) {
     log.append(element("div", "chat-message system",
-      "Здравствуйте. Диалог будет продолжаться с учётом последних сообщений. Если сервер или ИИ не настроен, я сообщу об этом прямо."
+      "JARVIS готов к локальному запуску. Нажмите «Загрузить локальный ИИ» или отправьте сообщение. При первом запуске модель будет загружена в кэш."
     ));
   } else {
     for (const item of history) {
@@ -413,9 +434,50 @@ function renderChat() {
     }
   }
 
+  function updateStatus() {
+    const state = getLocalAIStatus();
+    if (!state.supported) {
+      statusText.textContent = "WebGPU недоступен. Нужен актуальный Safari на iPadOS 26 или новее.";
+      loadButton.disabled = true;
+      return;
+    }
+    if (state.loaded) {
+      statusText.textContent = "Локальный ИИ запущен и готов отвечать.";
+      loadButton.textContent = "ИИ запущен";
+      loadButton.disabled = true;
+      progress.value = 1;
+      return;
+    }
+    statusText.textContent = state.loading
+      ? "Загрузка модели…"
+      : "Графический процессор доступен. Локальная модель ещё не загружена.";
+  }
+
+  async function loadAI() {
+    loadButton.disabled = true;
+    loadButton.textContent = "Запуск…";
+    statusText.textContent = "Подготовка локального ИИ…";
+    try {
+      await initializeLocalAI(({ progress: value, text }) => {
+        progress.value = value;
+        statusText.textContent = text;
+      });
+      statusText.textContent = "Локальный ИИ запущен и готов отвечать.";
+      loadButton.textContent = "ИИ запущен";
+      progress.value = 1;
+    } catch (error) {
+      statusText.textContent = error.message;
+      loadButton.disabled = false;
+      loadButton.textContent = "Повторить запуск";
+    }
+  }
+
+  loadButton.addEventListener("click", loadAI);
+  updateStatus();
+
   const form = element("form", "chat-form");
   const input = element("textarea", "module-textarea");
-  input.placeholder = "Введите сообщение...";
+  input.placeholder = "Напишите сообщение JARVIS…";
   input.rows = 2;
   input.required = true;
   input.setAttribute("aria-label", "Сообщение ассистенту");
@@ -427,6 +489,7 @@ function renderChat() {
   send.type = "submit";
   controls.append(voice, send);
   form.append(input, controls);
+
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     voice.disabled = true;
@@ -438,16 +501,30 @@ function renderChat() {
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       voice.disabled = true;
-      voice.textContent = "Слушаю...";
-      recognition.onresult = (event) => { input.value = event.results?.[0]?.[0]?.transcript || ""; input.focus(); };
-      recognition.onerror = () => { log.append(element("div", "chat-message system", "Не удалось распознать речь. Проверьте разрешение микрофона или введите сообщение текстом.")); };
-      recognition.onend = () => { voice.disabled = false; voice.textContent = "Говорить"; };
-      try { recognition.start(); } catch (error) {
-        voice.disabled = false; voice.textContent = "Говорить";
+      voice.textContent = "Слушаю…";
+      recognition.onresult = (event) => {
+        input.value = event.results?.[0]?.[0]?.transcript || "";
+        input.focus();
+      };
+      recognition.onerror = () => {
+        log.append(element("div", "chat-message system",
+          "Не удалось распознать речь. Проверьте разрешение микрофона или введите сообщение текстом."
+        ));
+      };
+      recognition.onend = () => {
+        voice.disabled = false;
+        voice.textContent = "Говорить";
+      };
+      try {
+        recognition.start();
+      } catch (error) {
+        voice.disabled = false;
+        voice.textContent = "Говорить";
         log.append(element("div", "chat-message system", error.message));
       }
     });
   }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = input.value.trim();
@@ -455,27 +532,19 @@ function renderChat() {
     log.append(element("div", "chat-message user", message));
     input.value = "";
     send.disabled = true;
-    send.textContent = "Отправка...";
+    send.textContent = "Думаю…";
     try {
       const localAnswer = runLocalCommand(message);
-      let answer;
-      if (localAnswer) {
-        answer = localAnswer;
-      } else {
-        const clientRequestId = globalThis.crypto?.randomUUID?.() || `request-${Date.now()}`;
-        const result = await sendChatMessage({
-          message,
-          conversationId,
-          clientRequestId,
-          history: history.slice(-20)
-        });
-        answer = result?.message?.content || "Сервер вернул пустой ответ.";
-      }
+      const answer = localAnswer || await generateLocalReply(history, message);
       const responseRow = element("div", "chat-message", answer);
       const speak = element("button", "module-button", "Озвучить");
       speak.type = "button";
       speak.addEventListener("click", () => {
-        if (!speakText(answer)) log.append(element("div", "chat-message system", "Озвучивание не поддерживается этим браузером."));
+        if (!speakText(answer)) {
+          log.append(element("div", "chat-message system",
+            "Озвучивание не поддерживается этим браузером."
+          ));
+        }
       });
       responseRow.append(document.createTextNode(" "), speak);
       log.append(responseRow);
@@ -493,12 +562,15 @@ function renderChat() {
       }
     } catch (error) {
       log.append(element("div", "chat-message system", error.message));
+      statusText.textContent = error.message;
     } finally {
       send.disabled = false;
       send.textContent = "Отправить";
       log.scrollTop = log.scrollHeight;
+      updateStatus();
     }
   });
+
   shell.append(log, form);
   return shell;
 }
