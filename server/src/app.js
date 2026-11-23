@@ -129,7 +129,7 @@ function sendApiError(response, error, origin, fallbackCode = "SERVER_ERROR") {
   sendJson(response, status, { error: { code, message } }, origin);
 }
 
-export function createAppServer({ config, provider, pushManager = null }) {
+export function createAppServer({ config, provider, pushManager = null, reminderScheduler = null }) {
   const checkRateLimit = createRateLimiter({
     windowMs: config.rateLimitWindowMs || 60_000,
     maxRequests: config.rateLimitMaxRequests || 20
@@ -167,7 +167,7 @@ export function createAppServer({ config, provider, pushManager = null }) {
         status: "ok",
         apiVersion: "v1",
         aiConfigured: config.isAiConfigured,
-        pushConfigured: Boolean(pushManager?.configured)
+        pushConfigured: Boolean(pushManager?.configured),\n        pushRemindersEnabled: Boolean(pushManager?.configured && reminderScheduler)
       }, allowedOrigin);
       return;
     }
@@ -215,6 +215,54 @@ export function createAppServer({ config, provider, pushManager = null }) {
       } catch (error) {
         sendApiError(response, error, allowedOrigin, "PUSH_REQUEST_FAILED");
       }
+      return;
+    }
+
+    if (path === `${API_PREFIX}/push/reminders`
+        || path.startsWith(`${API_PREFIX}/push/reminders/`)) {
+      if (!pushManager?.configured || !reminderScheduler) {
+        sendJson(response, 503, {
+          error: { code: "PUSH_NOT_CONFIGURED", message: "Серверные push-напоминания ещё не настроены." }
+        }, allowedOrigin);
+        return;
+      }
+      if (!config.isApiAuthEnabled) {
+        sendJson(response, 503, {
+          error: { code: "PUSH_AUTH_REQUIRED", message: "Для напоминаний сначала настройте API_ACCESS_TOKEN." }
+        }, allowedOrigin);
+        return;
+      }
+      if (!hasValidBearerToken(request, config.apiAccessToken)) {
+        sendJson(response, 401, {
+          error: { code: "UNAUTHORIZED", message: "Для управления напоминаниями нужен действительный токен." }
+        }, allowedOrigin);
+        return;
+      }
+      try {
+        if (request.method === "GET" && path === `${API_PREFIX}/push/reminders`) {
+          sendJson(response, 200, { reminders: await reminderScheduler.list() }, allowedOrigin);
+          return;
+        }
+        if (request.method === "POST" && path === `${API_PREFIX}/push/reminders`) {
+          const payload = await readJson(request, 16_384);
+          const reminder = await reminderScheduler.save(payload);
+          sendJson(response, 201, { reminder }, allowedOrigin);
+          return;
+        }
+        const prefix = `${API_PREFIX}/push/reminders/`;
+        if (request.method === "DELETE" && path.startsWith(prefix)) {
+          const id = decodeURIComponent(path.slice(prefix.length));
+          const result = await reminderScheduler.remove(id);
+          sendJson(response, 200, result, allowedOrigin);
+          return;
+        }
+      } catch (error) {
+        sendApiError(response, error, allowedOrigin, "PUSH_REMINDER_FAILED");
+        return;
+      }
+      sendJson(response, 405, {
+        error: { code: "METHOD_NOT_ALLOWED", message: "Метод запроса не поддерживается." }
+      }, allowedOrigin);
       return;
     }
 
