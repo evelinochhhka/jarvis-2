@@ -149,9 +149,38 @@ struct JarvisVoiceSettingsView: View {
                 return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
         voices = available.map(JarvisVoiceOption.init(voice:))
-        statusMessage = available.isEmpty
-            ? "Системные русские и украинские голоса не обнаружены. Проверьте «Настройки → Универсальный доступ → Устный контент → Голоса»."
-            : "Найдено голосов: \(available.count). Вы можете прослушать каждый до выбора."
+
+        var selectedDefaults: [String] = []
+        if selectedRussianVoiceIdentifier.isEmpty,
+           let preferred = available.first(where: {
+               $0.language.hasPrefix("ru") &&
+               ($0.name.localizedCaseInsensitiveContains("Голос 1") ||
+                $0.name.localizedCaseInsensitiveContains("Siri Voice 1"))
+           }) {
+            selectedRussianVoiceIdentifier = preferred.identifier
+            selectedDefaults.append("русский Siri Voice 1")
+        }
+
+        if selectedUkrainianVoiceIdentifier.isEmpty {
+            let lesyaVoices = available.filter {
+                $0.language.hasPrefix("uk") &&
+                ($0.name.localizedCaseInsensitiveContains("Леся") ||
+                 $0.name.localizedCaseInsensitiveContains("Lesya"))
+            }
+            if let preferred = lesyaVoices.first(where: { $0.quality == .enhanced || $0.quality == .premium })
+                ?? lesyaVoices.first {
+                selectedUkrainianVoiceIdentifier = preferred.identifier
+                selectedDefaults.append("украинский голос Леся")
+            }
+        }
+
+        if available.isEmpty {
+            statusMessage = "Системные русские и украинские голоса не обнаружены. Проверьте «Настройки → Универсальный доступ → Устный контент → Голоса»."
+        } else if selectedDefaults.isEmpty {
+            statusMessage = "Найдено голосов: \(available.count). Сохранённые настройки оставлены без изменений. Прослушайте образцы и выберите голос."
+        } else {
+            statusMessage = "Найдено голосов: \(available.count). Автоматически выбран доступный вариант: \(selectedDefaults.joined(separator: ", ")). Его можно изменить."
+        }
     }
 
     private func preview(_ option: JarvisVoiceOption) {
