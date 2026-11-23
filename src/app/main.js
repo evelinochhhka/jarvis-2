@@ -336,12 +336,15 @@ function runLocalCommand(message) {
     { type: "reminders", names: ["напоминания", "напомни", "напоминание"] }
   ];
   const target = aliases.find((entry) => entry.names.some((name) => normalized.includes(name)));
-  const addToList = text.match(/^(?:добавь|запиши|сохрани)\s+(.+?)\s+в\s+(.+)$/i);
+  const addDestinationFirst = text.match(/^(?:добавь|запиши|сохрани)\s+(?:мне\s+)?(?:в\s+)?(.+?)\s*[:,-]\s*(.+)$/i);
+  const addItemFirst = text.match(/^(?:добавь|запиши|сохрани)\s+(.+?)\s+в\s+(.+)$/i);
+  const addToList = addDestinationFirst || addItemFirst;
   if (addToList) {
-    const destination = addToList[2].toLocaleLowerCase("ru-RU");
+    const destination = (addDestinationFirst ? addToList[1] : addToList[2]).toLocaleLowerCase("ru-RU");
+    const title = addDestinationFirst ? addToList[2] : addToList[1];
     const type = aliases.find((entry) => entry.names.some((name) => destination.includes(name)))?.type;
-    if (type) {
-      const item = addItem(type, { title: addToList[1].trim() });
+    if (type && title.trim()) {
+      const item = addItem(type, { title: title.trim() });
       return "Сохранено в список «" + listConfig[type].title + "»: " + item.title + ".";
     }
   }
@@ -359,7 +362,7 @@ function runLocalCommand(message) {
     const needle = doneMatch[1].toLocaleLowerCase("ru-RU");
     for (const entry of aliases.filter((item) => item.type !== "reminders")) {
       const item = getItems(entry.type).find((candidate) => candidate.title.toLocaleLowerCase("ru-RU").includes(needle));
-      if (item) { updateItem(entry.type, item.id, { completed: true }); return "Отметила «" + item.title + "» как выполненное."; }
+      if (item) { updateItem(entry.type, item.id, { completed: true }); return "Готово. «" + item.title + "» отмечено как выполненное." }
     }
     return "Не нашла запись «" + doneMatch[1] + "» в ваших списках.";
   }
