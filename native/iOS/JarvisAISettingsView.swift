@@ -43,8 +43,14 @@ struct JarvisAISettingsView: View {
         defer { isChecking = false }
         let raw = serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let base = URL(string: raw),
-              let scheme = base.scheme?.lowercased(),
-              scheme == "https" || base.host == "localhost" || base.host == "127.0.0.1" else {
+              let scheme = base.scheme?.lowercased() else {
+            status = "Введите корректный HTTPS-адрес. HTTP разрешён только для localhost."
+            return
+        }
+        let host = base.host?.lowercased() ?? ""
+        let isSecure = scheme == "https"
+        let isLocalDevelopment = scheme == "http" && (host == "localhost" || host == "127.0.0.1")
+        guard isSecure || isLocalDevelopment else {
             status = "Введите корректный HTTPS-адрес. HTTP разрешён только для localhost."
             return
         }
