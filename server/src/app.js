@@ -167,7 +167,8 @@ export function createAppServer({ config, provider, pushManager = null, reminder
         status: "ok",
         apiVersion: "v1",
         aiConfigured: config.isAiConfigured,
-        pushConfigured: Boolean(pushManager?.configured),\n        pushRemindersEnabled: Boolean(pushManager?.configured && reminderScheduler)
+        pushConfigured: Boolean(pushManager?.configured),
+        pushRemindersEnabled: Boolean(pushManager?.configured && reminderScheduler)
       }, allowedOrigin);
       return;
     }
