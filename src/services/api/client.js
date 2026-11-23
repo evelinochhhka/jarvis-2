@@ -1,4 +1,14 @@
-const API_BASE = "/api/v1";
+function getApiBase() {
+  const configured = localStorage.getItem("jarvis-2-api-base-url") || "";
+  if (!configured) return "/api/v1";
+  try {
+    const parsed = new URL(configured);
+    if (!["https:", "http:"].includes(parsed.protocol)) return "/api/v1";
+    return `${parsed.origin}/api/v1`;
+  } catch {
+    return "/api/v1";
+  }
+}
 
 export class ApiError extends Error {
   constructor(message, status = 0, code = "API_ERROR") {
@@ -13,7 +23,7 @@ async function request(path, options = {}) {
   let response;
 
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${getApiBase()}${path}`, {
       ...options,
       headers: {
         Accept: "application/json",
