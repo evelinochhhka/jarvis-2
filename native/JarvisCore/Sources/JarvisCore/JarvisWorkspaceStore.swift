@@ -47,7 +47,7 @@ public struct JarvisReminderSchedule: Codable, Sendable, Equatable {
 public struct JarvisWorkspaceEntry: Codable, Identifiable, Sendable, Equatable {
     public let id: UUID
     public let list: JarvisWorkspaceList
-    public let title: String
+    public var title: String
     public let createdAt: Date
     public var isCompleted: Bool
     public var reminder: JarvisReminderSchedule?
