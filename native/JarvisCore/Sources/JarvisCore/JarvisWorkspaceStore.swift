@@ -96,6 +96,19 @@ public actor JarvisWorkspaceStore {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
+    public func update(id: UUID, title: String, reminder: JarvisReminderSchedule?) throws -> JarvisWorkspaceEntry {
+        try loadIfNeeded()
+        guard let index = entries.firstIndex(where: { $0.id == id }) else {
+            throw WorkspaceError.entryNotFound
+        }
+        let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedTitle.isEmpty else { throw WorkspaceError.emptyTitle }
+        entries[index].title = cleanedTitle
+        entries[index].reminder = entries[index].list == .reminders ? reminder : nil
+        try persist()
+        return entries[index]
+    }
+
     public func setCompleted(id: UUID, isCompleted: Bool) throws {
         try loadIfNeeded()
         guard let index = entries.firstIndex(where: { $0.id == id }) else {
