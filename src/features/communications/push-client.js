@@ -5,6 +5,11 @@ function isStandaloneApp() {
     globalThis.navigator?.standalone === true;
 }
 
+function accessHeaders() {
+  const token = globalThis.sessionStorage?.getItem("jarvis-2-api-access-token") || "";
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export function getPushCapability() {
   const supported = Boolean(
     globalThis.isSecureContext &&
@@ -78,13 +83,14 @@ export async function enablePushNotifications() {
     method: "POST",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...accessHeaders()
     },
     credentials: "same-origin",
     body: JSON.stringify(subscription)
   });
-  await readJson(saveResponse);
-  return subscription;
+  const saved = await readJson(saveResponse);
+  return { subscription, notificationSent: saved.notificationSent === true };
 }
 
 export async function disablePushNotifications() {
@@ -96,7 +102,8 @@ export async function disablePushNotifications() {
     method: "DELETE",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...accessHeaders()
     },
     credentials: "same-origin",
     body: JSON.stringify({ endpoint: subscription.endpoint })
