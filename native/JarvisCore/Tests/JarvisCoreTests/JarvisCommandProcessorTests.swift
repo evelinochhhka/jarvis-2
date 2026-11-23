@@ -54,7 +54,17 @@ final class JarvisCommandProcessorTests: XCTestCase {
         let entry = try await first.add(to: .wishlist, title: "Новый проект")
         let second = JarvisWorkspaceStore(fileURL: url)
         let restored = try await second.all(in: .wishlist)
-        XCTAssertEqual(restored, [entry])
+        XCTAssertEqual(restored.count, 1)
+        XCTAssertEqual(restored.first?.id, entry.id)
+        XCTAssertEqual(restored.first?.list, entry.list)
+        XCTAssertEqual(restored.first?.title, entry.title)
+        XCTAssertEqual(restored.first?.isCompleted, entry.isCompleted)
+        XCTAssertEqual(restored.first?.reminder, entry.reminder)
+        if let restoredDate = restored.first?.createdAt {
+            XCTAssertLessThan(abs(restoredDate.timeIntervalSince(entry.createdAt)), 1)
+        } else {
+            XCTFail("Persisted entry must retain its creation date")
+        }
     }
     func testReminderIsNotReportedAsScheduledWithoutDateAndTime() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
