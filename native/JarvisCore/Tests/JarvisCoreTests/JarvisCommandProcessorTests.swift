@@ -66,6 +66,7 @@ final class JarvisCommandProcessorTests: XCTestCase {
             XCTFail("Persisted entry must retain its creation date")
         }
     }
+
     func testReminderIsNotReportedAsScheduledWithoutDateAndTime() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let processor = JarvisCommandProcessor(
@@ -82,6 +83,26 @@ final class JarvisCommandProcessorTests: XCTestCase {
         XCTAssertNil(entries.first?.reminder)
     }
 
+    func testNaturalLanguageReminderStoresExtractedTitleAndSchedule() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let processor = JarvisCommandProcessor(
+            queue: CommandQueueStore(fileURL: directory.appendingPathComponent("queue.json")),
+            workspace: JarvisWorkspaceStore(fileURL: directory.appendingPathComponent("workspace.json"))
+        )
+
+        let result = try await processor.process(kind: .reminder, text: "купить тетради завтра в 18:30")
+        guard case let .saved(list, entryID) = result else {
+            return XCTFail("A reminder with an explicit date and time should be scheduled")
+        }
+        XCTAssertEqual(list, .reminders)
+        let entries = try await processor.entries(in: .reminders)
+        let entry = try XCTUnwrap(entries.first(where: { $0.id == entryID }))
+        XCTAssertEqual(entry.title, "купить тетради")
+        XCTAssertNotNil(entry.reminder)
+        XCTAssertEqual(entry.reminder?.repeatFrequency, .none)
+        XCTAssertGreaterThan(entry.reminder!.date, .now)
+    }
+
     func testExplicitReminderSchedulePersists() async throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString).appendingPathComponent("workspace.json")
@@ -94,5 +115,4 @@ final class JarvisCommandProcessorTests: XCTestCase {
         XCTAssertEqual(entries.first?.reminder, schedule)
         XCTAssertEqual(entries.first?.id, created.id)
     }
-
 }
