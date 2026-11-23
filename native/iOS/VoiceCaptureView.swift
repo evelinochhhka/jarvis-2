@@ -89,3 +89,4 @@ struct VoiceCaptureView: View {
             }
         }
     }
+}
