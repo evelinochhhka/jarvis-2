@@ -182,8 +182,11 @@ function renderList(type) {
             savePushReminder(updated).then(() => { pushNotice.textContent = "Напоминание синхронизировано с сервером."; })
               .catch(error => { pushNotice.textContent = `Сохранено локально. Push не синхронизирован: ${error.message}`; });
           } else {
-            deletePushReminder(item.id).catch(() => {});
-            if (pushNotice) pushNotice.textContent = "Напоминание выключено локально и на сервере.";
+            deletePushReminder(item.id).then(() => {
+              if (pushNotice) pushNotice.textContent = "Напоминание выключено локально и на сервере.";
+            }).catch(error => {
+              if (pushNotice) pushNotice.textContent = `Локально выключено, но сервер не получил удаление: ${error.message}`;
+            });
           }
         } else updateItem(type, item.id, { completed: checkbox.checked });
         refresh();
@@ -252,7 +255,13 @@ function renderList(type) {
       remove.type = "button";
       remove.addEventListener("click", () => {
         if (deleteItem(type, item.id)) {
-          if (type === "reminders") deletePushReminder(item.id).catch(() => {});
+          if (type === "reminders") {
+            deletePushReminder(item.id).then(() => {
+              if (pushNotice) pushNotice.textContent = "Напоминание удалено с устройства и сервера.";
+            }).catch(error => {
+              if (pushNotice) pushNotice.textContent = `Удалено локально, но сервер не получил удаление: ${error.message}`;
+            });
+          }
           refresh();
         }
       });
