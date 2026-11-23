@@ -1,7 +1,8 @@
 import { loadConfig } from "./config.js";
 import { createAppServer } from "./app.js";
 import { createOpenAICompatibleProvider } from "./providers/openai-compatible.js";
-import { createPushManager } from "./push.js";\nimport { createReminderScheduler } from "./reminders.js";
+import { createPushManager } from "./push.js";
+import { createReminderScheduler from "./reminders.js";
 
 const config = loadConfig();
 const provider = createOpenAICompatibleProvider(config);
