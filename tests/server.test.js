@@ -161,3 +161,29 @@ test("chat rejects untrusted system-role history entries", async () => {
   });
 });
 
+
+
+test("OpenRouter Nemotron requests extended reasoning through the compatible chat API", async () => {
+  let captured;
+  const provider = createOpenAICompatibleProvider({
+    provider: "openrouter",
+    apiKey: "test-openrouter-key",
+    baseUrl: "https://openrouter.ai/api/v1",
+    model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    requestTimeoutMs: 1000
+  }, async (url, options) => {
+    captured = { url, options, body: JSON.parse(options.body) };
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: "Готово." } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+
+  const reply = await provider.generateReply({ message: "Проверь план" });
+  assert.equal(reply, "Готово.");
+  assert.equal(captured.url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.equal(captured.body.model, "nvidia/nemotron-3-ultra-550b-a55b:free");
+  assert.deepEqual(captured.body.reasoning, { effort: "high" });
+  assert.equal(captured.body.max_tokens, 4096);
+  assert.equal(captured.options.headers.Authorization, "Bearer test-openrouter-key");
+  assert.equal(captured.options.headers["X-Title"], "JARVIS 2");
+});
