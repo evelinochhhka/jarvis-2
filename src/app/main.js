@@ -198,8 +198,32 @@ function renderList(type) {
         if (nextTitle === null) return;
         const nextNote = window.prompt("Заметка:", item.note || "");
         if (nextNote === null) return;
+        const changes = { title: nextTitle, note: nextNote };
+        if (type === "reminders") {
+          const currentDate = new Date(item.dueAt);
+          const localDate = new Date(currentDate.getTime() - currentDate.getTimezoneOffset() * 60_000)
+            .toISOString().slice(0, 16);
+          const nextDueAt = window.prompt("Дата и время (ГГГГ-ММ-ДД ЧЧ:ММ):", localDate);
+          if (nextDueAt === null) return;
+          const nextRepeat = window.prompt(
+            "Повтор: none, daily, weekly или monthly",
+            item.repeat?.frequency || "none"
+          );
+          if (nextRepeat === null) return;
+          if (!["none", "daily", "weekly", "monthly"].includes(nextRepeat)) {
+            window.alert("Неизвестный тип повтора.");
+            return;
+          }
+          const parsedDate = new Date(nextDueAt);
+          if (Number.isNaN(parsedDate.getTime())) {
+            window.alert("Не удалось распознать дату и время.");
+            return;
+          }
+          changes.dueAt = parsedDate.toISOString();
+          changes.repeat = { frequency: nextRepeat, interval: item.repeat?.interval || 1 };
+        }
         try {
-          updateItem(type, item.id, { title: nextTitle, note: nextNote });
+          updateItem(type, item.id, changes);
           refresh();
         } catch (error) {
           window.alert(error.message || "Не удалось изменить элемент.");
