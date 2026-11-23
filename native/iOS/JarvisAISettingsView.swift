@@ -80,7 +80,7 @@ struct JarvisAISettingsView: View {
             request.timeoutInterval = 10
             let token = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
             if !token.isEmpty {
-                request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
