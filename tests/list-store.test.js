@@ -59,3 +59,20 @@ test("rejects malformed backup without replacing current data", () => {
 test("rejects empty item titles", () => {
   assert.throws(() => addItem("tasks", { title: "   " }));
 });
+
+
+test("updates reminder date and recurrence without changing its identity", () => {
+  const reminder = addItem("reminders", {
+    title: "Проверить напоминание",
+    dueAt: "2027-01-10T12:30",
+    repeat: { frequency: "none", interval: 1 }
+  });
+  const updated = updateItem("reminders", reminder.id, {
+    dueAt: "2027-01-12T18:45",
+    repeat: { frequency: "monthly", interval: 1 }
+  });
+
+  assert.equal(updated.id, reminder.id);
+  assert.equal(updated.dueAt, new Date("2027-01-12T18:45").toISOString());
+  assert.equal(updated.repeat.frequency, "monthly");
+});
