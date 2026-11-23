@@ -1,10 +1,24 @@
 {
+  "id": "./",
   "name": "JARVIS 2",
   "short_name": "JARVIS",
-  "start_url": "./",
+  "description": "Личный помощник JARVIS 2",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#101418",
-  "theme_color": "#101418",
-  "lang": "ru"
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#101316",
+  "theme_color": "#101316",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
