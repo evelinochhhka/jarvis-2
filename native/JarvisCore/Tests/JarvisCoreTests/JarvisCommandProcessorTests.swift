@@ -98,9 +98,9 @@ final class JarvisCommandProcessorTests: XCTestCase {
         let entries = try await processor.entries(in: .reminders)
         let entry = try XCTUnwrap(entries.first(where: { $0.id == entryID }))
         XCTAssertEqual(entry.title, "купить тетради")
-        XCTAssertNotNil(entry.reminder)
-        XCTAssertEqual(entry.reminder?.repeatFrequency, .none)
-        XCTAssertGreaterThan(entry.reminder!.date, .now)
+        let schedule = try XCTUnwrap(entry.reminder)
+        XCTAssertEqual(schedule.repeatFrequency, JarvisReminderRepeat.none)
+        XCTAssertGreaterThan(schedule.date, .now)
     }
 
     func testExplicitReminderSchedulePersists() async throws {
